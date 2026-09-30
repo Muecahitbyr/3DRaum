@@ -32,15 +32,6 @@ export const OPENING_TYPE_LABELS: Record<OpeningType, string> = {
   window: 'Fenster',
 };
 
-export const WALL_SIDE_LABELS: Record<WallSide, string> = {
-  north: 'Nord (oben)',
-  east: 'Ost (rechts)',
-  south: 'Süd (unten)',
-  west: 'West (links)',
-};
-
-export const WALL_SIDES: readonly WallSide[] = ['north', 'east', 'south', 'west'];
-
 /** 3D-Darstellung der Rahmen und Türblätter. */
 export const OPENING_MODEL_CONFIG = {
   frameWidth: 0.05,

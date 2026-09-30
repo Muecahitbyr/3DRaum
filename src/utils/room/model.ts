@@ -142,12 +142,6 @@ export function wallPoint(wall: WallSegment, along: Meters, into: Meters): Floor
   };
 }
 
-/** Position entlang der Wand (ab Anfang) und Abstand ins Rauminnere eines Weltpunkts. */
-export function measureOnWall(wall: WallSegment, point: FloorPoint) {
-  const rel = sub(point, wall.start);
-  return { along: dot(rel, wall.axis), into: dot(rel, wall.inward) };
-}
-
 /**
  * Umrechnung zwischen gespeicherter Position (ab Wandanfang) und angezeigter Position
  * („von links“ bzw. „von oben“ im Grundriss) – beide bis zur jeweils näheren Kante.

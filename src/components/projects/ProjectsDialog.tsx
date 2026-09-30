@@ -1,14 +1,15 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
+import { ROOM_SHAPE_LABELS } from '../../config/room';
+import { PROJECT_FILE_EXTENSION } from '../../export/files';
 import { PROJECT_NAME_MAX_LENGTH } from '../../projects/format';
 import type { ProjectSummary } from '../../projects/storage';
-import { ROOM_SHAPE_LABELS } from '../../config/room';
 import type { RoomShape } from '../../types/room';
 import { Button } from '../ui/Button';
+import { Dialog } from '../ui/Dialog';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import styles from './ProjectsDialog.module.css';
 
 const SHAPE_OPTIONS = (Object.keys(ROOM_SHAPE_LABELS) as RoomShape[]).map((value) => ({ value, label: ROOM_SHAPE_LABELS[value] }));
-import { Dialog } from '../ui/Dialog';
-import styles from './ProjectsDialog.module.css';
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -21,11 +22,14 @@ interface ProjectsDialogProps {
   onDelete: (project: ProjectSummary) => void;
   /** Neues Projekt mit gewählter Raumform. */
   onNew: (shape: RoomShape) => void;
+  /** Projektdatei (.3draum) importieren. */
+  onImport: (file: File) => void;
   onClose: () => void;
 }
 
 /** Übersicht der lokal gespeicherten Projekte. */
-export function ProjectsDialog({ projects, currentId, error, onOpen, onRename, onDelete, onNew, onClose }: ProjectsDialogProps) {
+export function ProjectsDialog({ projects, currentId, error, onOpen, onRename, onDelete, onNew, onImport, onClose }: ProjectsDialogProps) {
+  const fileInput = useRef<HTMLInputElement>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [shape, setShape] = useState<RoomShape>('rectangle');
 
@@ -47,6 +51,24 @@ export function ProjectsDialog({ projects, currentId, error, onOpen, onRename, o
             Neues Projekt
           </Button>
         </div>
+      </div>
+      <div className={styles.importRow}>
+        <span>Von einem anderen Gerät? Projektdatei ({PROJECT_FILE_EXTENSION}) laden:</span>
+        <Button onClick={() => fileInput.current?.click()} data-testid="project-import">
+          Projektdatei importieren
+        </Button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept={`${PROJECT_FILE_EXTENSION},application/json,.json`}
+          hidden
+          data-testid="project-import-input"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file) onImport(file);
+          }}
+        />
       </div>
       {error && (
         <p className={styles.error} role="alert">

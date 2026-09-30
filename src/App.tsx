@@ -1,7 +1,19 @@
-import { useCallback, useEffect, useState, type FocusEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FocusEvent } from 'react';
 import { describeCollisions, type ObjectRef } from './collision';
 import { HistoryControls } from './components/layout/HistoryControls';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ExportDialog, type ExportKind } from './components/export/ExportDialog';
+import { Fallback } from './components/layout/Fallback';
+import { MenuButton } from './components/layout/MenuButton';
 import { PlannerLayout } from './components/layout/PlannerLayout';
+import type { SceneCaptureApi } from './components/scene/SceneCapture';
+import { STATUS_TEXT } from './components/projects/ProjectBar';
+import { canvasToBlob, downloadBlob, projectFileBlob, safeFileName } from './export/files';
+import { renderPlanImage } from './export/planImage';
+import { buildReport } from './export/report';
+import { COMPACT_QUERY, useMediaQuery } from './hooks/useMediaQuery';
+import { DEFAULT_PROJECT_NAME } from './projects/format';
+import { isWebGLAvailable } from './utils/webgl';
 import { FurnitureLibrary } from './components/library/FurnitureLibrary';
 import { ProjectManager } from './components/projects/ProjectManager';
 import { Workspace } from './components/layout/Workspace';
@@ -25,6 +37,17 @@ import { useProjectSession } from './hooks/useProjectSession';
 import type { ViewMode } from './types/view';
 import { getFixtureDisplayName } from './utils/fixtures';
 import { getOpeningDisplayName } from './utils/openingLabels';
+
+/** Eigenschaften-Bereiche der Seitenleiste (Möbel, Mehrfachauswahl, Tür/Fenster, Raumobjekt, Wand). */
+const SELECTION_PANELS = [
+  'furniture-properties',
+  'multi-selection',
+  'opening-properties',
+  'fixture-properties',
+  'wall-properties',
+]
+  .map((id) => `[data-testid="${id}"]`)
+  .join(', ');
 
 export function App() {
   const planner = usePlanner();
@@ -55,6 +78,8 @@ export function App() {
     if (!roomEditing) {
       setViewMode('2d');
       setPreview(false);
+      // Schmale Bildschirme: Drawer schließen, damit der Grundriss frei ist.
+      setDrawerOpen(false);
     }
     else if (selectedWallId || selectedCornerId) clearSelection();
     setRoomEditing(!roomEditing);
@@ -77,8 +102,70 @@ export function App() {
   }, [state.layoutToken]);
   const [modalOpen, setModalOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  useHistoryShortcuts(history, !modalOpen && !libraryOpen);
-  useEditingShortcuts(planner, !modalOpen && !libraryOpen);
+  const [exportOpen, setExportOpen] = useState(false);
+  const anyDialog = modalOpen || libraryOpen || exportOpen;
+  useHistoryShortcuts(history, !anyDialog);
+  useEditingShortcuts(planner, !anyDialog);
+
+  // Schmale Bildschirme: Sidebar als Drawer; Auswahl im Plan öffnet ihn nicht ungefragt.
+  const compact = useMediaQuery(COMPACT_QUERY);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const projectName = projectSession.current?.name ?? DEFAULT_PROJECT_NAME;
+  const projectStatus = projectSession.dirty ? 'dirty' : projectSession.current ? 'saved' : 'new';
+
+  // ---------- Export (Bilder, PDF, Projektdatei)
+  const webgl = isWebGLAvailable();
+  const capture = useRef<SceneCaptureApi | null>(null);
+  const onCaptureReady = useCallback((api: SceneCaptureApi | null) => {
+    capture.current = api;
+  }, []);
+  const viewRef = useRef({ viewMode, preview });
+  viewRef.current = { viewMode, preview };
+  /** 3D-Vorschaubild; ist die Vorschau nicht offen, wird sie kurz geöffnet und danach zurückgestellt. */
+  const capturePreview = async (): Promise<HTMLCanvasElement | null> => {
+    if (!webgl || !capture.current) return null;
+    const before = viewRef.current;
+    const switching = before.viewMode !== '3d' || !before.preview;
+    if (switching) {
+      setViewMode('3d');
+      setPreview(true);
+      await frames(8);
+    }
+    try {
+      return capture.current?.capture(3200) ?? null;
+    } finally {
+      if (switching) {
+        setViewMode(before.viewMode);
+        setPreview(before.preview);
+      }
+    }
+  };
+  const runExport = async (kind: ExportKind): Promise<string> => {
+    const planInput = { room, openings: state.openings, fixtures: state.fixtures, furniture: state.furniture };
+    if (kind === 'project') {
+      const fileName = safeFileName(projectName, '.3draum');
+      downloadBlob(projectFileBlob(projectName, plan), fileName);
+      return fileName;
+    }
+    if (kind === 'plan-png') {
+      const fileName = safeFileName(projectName, ' – Grundriss.png');
+      downloadBlob(await canvasToBlob(renderPlanImage(planInput)), fileName);
+      return fileName;
+    }
+    if (kind === '3d-png') {
+      const image = await capturePreview();
+      if (!image) throw new Error('Die 3D-Ansicht ist nicht verfügbar.');
+      const fileName = safeFileName(projectName, ' – 3D.png');
+      downloadBlob(await canvasToBlob(image), fileName);
+      return fileName;
+    }
+    const previewImage = await capturePreview().catch(() => null);
+    const blob = await buildReport({ projectName, date: new Date(), plan, room, planImage: renderPlanImage(planInput, { maxSize: 2600 }), previewImage });
+    const fileName = safeFileName(projectName, ' – Planungsbericht.pdf');
+    downloadBlob(blob, fileName);
+    return fileName;
+  };
 
   // Verlauf: Eine Feldbearbeitung (Fokus bis Verlassen) ist EIN Schritt, auch wenn
   // Eingaben schon beim Tippen live übernommen werden. Gesten im Grundriss ebenso.
@@ -112,11 +199,37 @@ export function App() {
 
   const multiSelection = selectedFurnitureIds.length > 1;
   const selectedItems = multiSelection ? state.furniture.filter((f) => selectedFurnitureIds.includes(f.id)) : [];
+  // Schmale Bildschirme: Name der Auswahl im Chip „… bearbeiten“.
+  const selectionName = multiSelection
+    ? `${selectedFurnitureIds.length} Möbel`
+    : selectedFurniture?.name ??
+      (selectedOpening && getOpeningDisplayName(selectedOpening, state.openings)) ??
+      (selectedFixture && getFixtureDisplayName(selectedFixture, state.fixtures)) ??
+      (selectedWallId && room.wallById.get(selectedWallId)?.label) ??
+      null;
+  // Chip „… bearbeiten“: Drawer öffnen und direkt zu den Eigenschaften der Auswahl springen.
+  const openSelectionProperties = () => {
+    setDrawerOpen(true);
+    requestAnimationFrame(() =>
+      document
+        .querySelector(SELECTION_PANELS)
+        ?.scrollIntoView({ block: 'start', behavior: 'auto' }),
+    );
+  };
 
   return (
     <PlannerLayout
+      compact={compact}
+      drawerOpen={drawerOpen}
+      onDrawerClose={closeDrawer}
       sidebar={
-        <Sidebar onFocusCapture={handleSidebarFocus} onBlurCapture={handleSidebarBlur}>
+        <Sidebar
+          onFocusCapture={handleSidebarFocus}
+          onBlurCapture={handleSidebarBlur}
+          // Im Drawer (schmale Bildschirme) steht das Projekt in der Kopfzeile; sonst in der Projektleiste.
+          project={compact ? { name: projectName, status: STATUS_TEXT[projectStatus] } : undefined}
+          onClose={compact ? closeDrawer : undefined}
+        >
           <RoomPanel
             room={room}
             editing={roomEditing}
@@ -228,12 +341,54 @@ export function App() {
         preview={preview}
         onPreviewChange={setPreview}
         notice={<RoomFeedback feedback={state.roomFeedback} />}
-        actions={<HistoryControls history={history} />}
+        actions={
+          <>
+            {compact && <MenuButton open={drawerOpen} onClick={() => setDrawerOpen((open) => !open)} />}
+            <HistoryControls history={history} />
+          </>
+        }
         trailing={
-          <ProjectManager session={projectSession} onPlanReplaced={handlePlanReplaced} onModalChange={setModalOpen} />
+          <ProjectManager
+            session={projectSession}
+            onPlanReplaced={handlePlanReplaced}
+            onModalChange={setModalOpen}
+            onOpenExport={() => setExportOpen(true)}
+          />
+        }
+        bottom={
+          compact && !drawerOpen && selectionName ? (
+            <button
+              type="button"
+              className="selection-chip"
+              onClick={openSelectionProperties}
+              aria-label={`${selectionName}: Eigenschaften bearbeiten`}
+              data-testid="selection-chip"
+            >
+              <span className="selection-chip-name">{selectionName}</span>
+              <span aria-hidden="true">· bearbeiten</span>
+            </button>
+          ) : undefined
         }
       >
+        {!webgl ? (
+          <Fallback
+            testId="webgl-missing"
+            title="3D-Darstellung nicht verfügbar"
+            message="Dieser Browser oder dieses Gerät unterstützt kein WebGL. Planen über die Seitenleiste, Speichern sowie Grundriss- und Projektexport funktionieren weiterhin."
+          />
+        ) : (
+          <ErrorBoundary
+            fallback={(_error, reset) => (
+              <Fallback
+                testId="scene-error"
+                title="Die Darstellung wurde unterbrochen"
+                message="Der Plan ist unverändert. Die Ansicht kann neu gestartet werden."
+                action={{ label: 'Ansicht neu starten', onClick: reset }}
+              />
+            )}
+          >
         <PlannerCanvas
+          onCaptureReady={onCaptureReady}
           room={room}
           roomEditing={roomEditing}
           selectedWallId={selectedWallId}
@@ -267,7 +422,10 @@ export function App() {
           viewMode={viewMode}
           cameraFitToken={cameraFitToken}
         />
+          </ErrorBoundary>
+        )}
       </Workspace>
+      {exportOpen && <ExportDialog onExport={runExport} canRender3d={webgl} onClose={() => setExportOpen(false)} />}
       {libraryOpen && (
         <FurnitureLibrary
           onAdd={(type) => {
@@ -279,4 +437,12 @@ export function App() {
       )}
     </PlannerLayout>
   );
+}
+
+/** Einige Frames abwarten (Ansicht umschalten, Kamera setzen, rendern). */
+function frames(count: number): Promise<void> {
+  return new Promise((resolve) => {
+    const step = (n: number) => (n <= 0 ? resolve() : requestAnimationFrame(() => step(n - 1)));
+    step(count);
+  });
 }

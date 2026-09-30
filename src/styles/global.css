@@ -4,9 +4,11 @@
   --color-border: #e3e6eb;
   --color-border-strong: #cfd4dc;
   --color-text: #1b1f27;
-  --color-text-muted: #6b7380;
+  --color-text-muted: #5d6572;
   --color-accent: #2563eb;
   --color-accent-soft: rgba(37, 99, 235, 0.14);
+  /* Akzent als Textfarbe auf hellen/getönten Flächen (Kontrast ≥ 4,5:1). */
+  --color-accent-text: #1d4ed8;
   --color-danger: #d92d20;
 
   --radius-sm: 6px;
@@ -55,4 +57,42 @@ button,
 input {
   font: inherit;
   color: inherit;
+}
+
+/* Schmale Bildschirme: Auswahl bearbeiten (öffnet die Seitenleiste). */
+.selection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
+  min-height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow: var(--shadow-md);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.selection-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-chip:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+/* Touch-Geräte: Eingabefelder mit mindestens 16 px Schrift – sonst zoomt iOS beim Fokussieren
+   die ganze Seite (überschreibt die kleineren Schriftgrößen der Feld-Komponenten). */
+@media (pointer: coarse) {
+  input:not([type='range']):not([type='checkbox']):not([type='color']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }

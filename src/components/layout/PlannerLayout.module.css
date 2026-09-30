@@ -10,24 +10,47 @@
   border-right: 1px solid var(--color-border);
   background: var(--color-surface);
   z-index: 1;
+  outline: none;
 }
 
 .workspace {
   position: relative;
   min-width: 0;
   min-height: 0;
+  /* Werkzeugleisten richten sich nach der tatsächlichen Breite der Arbeitsfläche. */
+  container: workspace / inline-size;
 }
 
-/* Fallback für schmale Geräte: Sidebar oben, Arbeitsfläche darunter. */
-@media (max-width: 640px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
+/* Schmale Bildschirme (Smartphone, Tablet hochkant): Sidebar als Drawer. */
+.layout[data-compact='true'] {
+  grid-template-columns: minmax(0, 1fr);
+}
 
-  .sidebar {
-    max-height: 45dvh;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
+.layout[data-compact='true'] .sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 60;
+  width: min(360px, 88vw);
+  box-shadow: 0 16px 48px rgba(16, 24, 40, 0.24);
+  transform: translateX(-102%);
+  transition: transform 180ms ease;
+}
+
+.layout[data-drawer='true'] .sidebar {
+  transform: none;
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(16, 24, 40, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layout[data-compact='true'] .sidebar {
+    transition: none;
   }
 }

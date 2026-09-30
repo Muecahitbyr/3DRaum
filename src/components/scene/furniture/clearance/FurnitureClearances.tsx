@@ -1,5 +1,6 @@
 import { Html, Line } from '@react-three/drei';
 import { useMemo, useState, type SyntheticEvent } from 'react';
+import { rectanglePolygon } from '../../../../collision/geometry';
 import { SCENE_COLORS } from '../../../../config/scene';
 import type { FurnitureItem } from '../../../../types/furniture';
 import type { RoomFixture } from '../../../../types/fixture';
@@ -13,9 +14,14 @@ import styles from './FurnitureClearances.module.css';
 const Y = 0.04;
 const ARROW_PX = 7;
 const TICK_PX = 5;
-/** Kürzere Strecken bekommen das Etikett seitlich versetzt, damit die Linie sichtbar bleibt. */
+/**
+ * Kürzere Strecken bekommen das Etikett seitlich neben das Möbel (außerhalb seiner
+ * Grundfläche), damit die Linie sichtbar bleibt und das Etikett nicht über dem Möbel liegt –
+ * sonst fängt es Finger/Maus ab, wenn das Möbel gegriffen werden soll. Abstand = halbe
+ * Etikettgröße (quer zur Messrichtung) + Luft.
+ */
 const MIN_INLINE_PX = 48;
-const LABEL_SIDE_PX = 16;
+const LABEL_BESIDE_PX = { horizontal: 16, vertical: 30 };
 
 type P3 = [number, number, number];
 
@@ -40,6 +46,7 @@ interface FurnitureClearancesProps {
  */
 export function FurnitureClearances({ item, furniture, room, fixtures = NO_FIXTURES, metersPerPixel, onMove }: FurnitureClearancesProps) {
   const clearances = useMemo(() => computeClearances(item, furniture, room, fixtures), [item, furniture, room, fixtures]);
+  const footprint = useMemo(() => rectanglePolygon(item.position, item.width / 2, item.depth / 2, item.rotationDeg), [item]);
   const toWorld = (p: FloorPoint, y = Y): P3 => [p.x - room.origin.x, y, p.z - room.origin.z];
 
   return (
@@ -48,6 +55,7 @@ export function FurnitureClearances({ item, furniture, room, fixtures = NO_FIXTU
         <ClearanceMeasure
           key={c.direction}
           clearance={c}
+          footprint={footprint}
           toWorld={toWorld}
           metersPerPixel={metersPerPixel}
           onSubmit={(meters) => onMove(item.id, positionForClearance(item, c, meters))}
@@ -59,12 +67,14 @@ export function FurnitureClearances({ item, furniture, room, fixtures = NO_FIXTU
 
 interface ClearanceMeasureProps {
   clearance: Clearance;
+  /** Grundfläche des Möbels (Plan-Koordinaten) – kurze Maße werden daneben beschriftet. */
+  footprint: readonly FloorPoint[];
   toWorld: (p: FloorPoint, y?: number) => P3;
   metersPerPixel: number;
   onSubmit: (meters: number) => void;
 }
 
-function ClearanceMeasure({ clearance: c, toWorld, metersPerPixel, onSubmit }: ClearanceMeasureProps) {
+function ClearanceMeasure({ clearance: c, footprint, toWorld, metersPerPixel, onSubmit }: ClearanceMeasureProps) {
   const d = DIRECTION_VECTORS[c.direction];
   const n = { x: -d.z, z: d.x }; // senkrecht zur Messrichtung
   const px = (v: number) => v * metersPerPixel;
@@ -89,7 +99,10 @@ function ClearanceMeasure({ clearance: c, toWorld, metersPerPixel, onSubmit }: C
   }
 
   const mid = { x: (c.from.x + c.to.x) / 2, z: (c.from.z + c.to.z) / 2 };
-  const labelAt = c.conflict || lengthPx >= MIN_INLINE_PX ? mid : lengthPx < 1 ? at(c.from, px(14), 0) : at(mid, 0, px(LABEL_SIDE_PX));
+  // Seitlich: über die Möbelkante (quer zur Messrichtung) hinaus.
+  const beyond = Math.max(...footprint.map((p) => (p.x - c.from.x) * n.x + (p.z - c.from.z) * n.z));
+  const beside = beyond + px(d.x !== 0 ? LABEL_BESIDE_PX.horizontal : LABEL_BESIDE_PX.vertical);
+  const labelAt = c.conflict || lengthPx >= MIN_INLINE_PX ? mid : at(mid, 0, beside);
 
   return (
     <group name={`clearance-${c.direction}`}>

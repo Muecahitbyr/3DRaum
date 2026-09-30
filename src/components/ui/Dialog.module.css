@@ -3,6 +3,7 @@
   inset: 0;
   z-index: 100;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 16px;
   background: rgba(16, 24, 40, 0.35);
@@ -14,6 +15,7 @@
   display: flex;
   flex-direction: column;
   width: min(100%, var(--dialog-width, 460px));
+  min-width: 0;
   max-height: min(100%, 640px);
   border-radius: 12px;
   background: var(--color-surface);
@@ -37,6 +39,7 @@
 
 .body {
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px 20px 16px;
 }
 
@@ -46,6 +49,25 @@
   gap: 8px;
   padding: 12px 20px 16px;
   border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 480px) {
+  .backdrop {
+    padding: 12px;
+  }
+
+  .header {
+    padding: 14px 16px 10px;
+  }
+
+  .body {
+    padding: 4px 16px 14px;
+  }
+
+  .footer {
+    flex-wrap: wrap;
+    padding: 10px 16px 14px;
+  }
 }
 
 @keyframes fade {

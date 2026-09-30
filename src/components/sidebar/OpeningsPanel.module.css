@@ -39,7 +39,7 @@
 .item[aria-pressed='true'] {
   border-color: var(--color-accent-soft);
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .itemName {

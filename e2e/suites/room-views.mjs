@@ -125,9 +125,10 @@ check('3D: Drehen funktioniert weiterhin', Buffer.compare(pre, await canvasShot(
 // Tablet
 await page.setViewportSize({ width: 820, height: 1180 }); await toggle('2D'); await settle(); await shot('10-tablet-2d');
 l = await labels();
-const tabExp = expectedFit(8, 3.5, 820 + 40, 1180); // Sidebar auf Tablet 240 statt 280 px
-s = spans(l);
-check('Tablet 2D: Labels im sichtbaren Bereich', l.every((x) => x.cx > 240 && x.cx < 820 && x.cy > 0 && x.cy < 1180));
+// Tablet: Seitenleiste ist ein geschlossener Drawer → Arbeitsfläche über die volle Breite
+const drawer = await page.getByTestId('sidebar').boundingBox();
+check('Tablet 2D: Seitenleiste als geschlossener Drawer', drawer.x + drawer.width <= 0, JSON.stringify(drawer));
+check('Tablet 2D: Labels im sichtbaren Bereich', l.length === 4 && l.every((x) => x.cx > 24 && x.cx < 796 && x.cy > 0 && x.cy < 1180), JSON.stringify(l.map((x) => [Math.round(x.cx), Math.round(x.cy)])));
 
 check('Keine Konsolenfehler', errors.length === 0, errors.slice(0, 3).join(' || '));
 await browser.close();

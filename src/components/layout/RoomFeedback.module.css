@@ -14,3 +14,10 @@
   transform: translateX(-50%);
   pointer-events: none;
 }
+
+/* Ansichtsleiste liegt dann unter der Projektleiste – Meldung darunter. */
+@container workspace (max-width: 1060px) {
+  .feedback {
+    top: 120px;
+  }
+}

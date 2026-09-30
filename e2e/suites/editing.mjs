@@ -117,7 +117,8 @@ check('Verlauf: „Möbel einfügen“', (await undoTitle()) === 'Möbel einfüg
 const nameInput = field('Name');
 await nameInput.click(); await nameInput.press('End');
 await page.keyboard.press('ControlOrMeta+d'); await page.keyboard.press('Backspace'); await settle();
-check('Im Textfeld: Strg/⌘+D dupliziert nicht, Rücktaste löscht nur ein Zeichen', (await names()).length === 5 && (await nameInput.inputValue()) === 'Stuhl', JSON.stringify([await names(), await nameInput.inputValue()]));
+// „Stuhl 5“ → „Stuhl “: genau ein Zeichen gelöscht (das Leerzeichen bleibt beim Tippen erhalten).
+check('Im Textfeld: Strg/⌘+D dupliziert nicht, Rücktaste löscht nur ein Zeichen', (await names()).length === 5 && (await nameInput.inputValue()) === 'Stuhl ', JSON.stringify([await names(), await nameInput.inputValue()]));
 await nameInput.fill('Stuhl 5'); await nameInput.press('Enter'); await settle();
 const xInput = field('X-Position');
 await xInput.click(); await page.keyboard.press('ArrowRight'); await settle();

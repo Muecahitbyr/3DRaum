@@ -131,3 +131,9 @@
   color: var(--color-text-muted);
   text-align: center;
 }
+
+@media (pointer: coarse) {
+  .tab {
+    height: 40px;
+  }
+}

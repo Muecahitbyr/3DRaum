@@ -1,7 +1,7 @@
 import { Edges, useCursor } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Group } from 'three';
+import { EdgesGeometry, type Group } from 'three';
 import { PLAN_DESIGN_CONFIG, WALL_FINISHES } from '../../../config/design';
 import type { WallFinish } from '../../../types/design';
 import { getWallTextures } from '../materials/wallTextures';
@@ -18,6 +18,9 @@ import { FixtureElement } from './fixtures/FixtureElement';
 import { CLICK_DRAG_TOLERANCE_PX, OpeningElement } from './openings/OpeningElement';
 import type { RoomVariant } from './Room';
 import { useWallFade } from './useWallFade';
+
+/** Winkel-Schwellwert für Kanten – wie der Standard von drei `Edges`. */
+const EDGE_THRESHOLD_DEG = 15;
 
 interface WallProps {
   wall: WallSegment;
@@ -81,6 +84,13 @@ export function Wall({
     [length, wall.height, wall.thickness, wall.outerStart, wall.outerEnd, spans, isPlan],
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
+  // Kantenzahl (gleicher Winkel-Schwellwert wie drei `Edges`) – Schlüssel für die Kantenlinien.
+  const edgeCount = useMemo(() => {
+    const edges = new EdgesGeometry(geometry, EDGE_THRESHOLD_DEG);
+    const count = edges.attributes.position.count;
+    edges.dispose();
+    return count;
+  }, [geometry]);
 
   // Grundriss: Wände bleiben dunkel (Lesbarkeit); die Wandfarbe erscheint nur als Streifen.
   const color = isPlan ? (selected ? SCENE_COLORS.selection : SCENE_COLORS.planWall) : wallColor;
@@ -144,8 +154,10 @@ export function Wall({
           bumpMap={textures?.bump ?? null}
           bumpScale={surface.bumpScale}
         />
-        {/* Technische Kanten nur zum Bearbeiten – die Vorschau wirkt ohne sie realistischer. */}
-        {(isPlan || fade) && <Edges color={isPlan ? color : SCENE_COLORS.wallEdge} />}
+        {/* Technische Kanten nur zum Bearbeiten – die Vorschau wirkt ohne sie realistischer.
+            Bei geänderter Kantenzahl neu aufbauen: Edges befüllt sonst die alte Liniengeometrie, und
+            three.js behält deren Segmentanzahl bei (Streulinien bzw. fehlende Kanten). */}
+        {(isPlan || fade) && <Edges key={edgeCount} color={isPlan ? color : SCENE_COLORS.wallEdge} />}
       </mesh>
       {isPlan && (
         <mesh

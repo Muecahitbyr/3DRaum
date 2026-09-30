@@ -41,11 +41,13 @@ interface WorkspaceProps {
   /** 3D: Vorschau statt Bearbeiten. */
   preview?: boolean;
   onPreviewChange?: (preview: boolean) => void;
+  /** Unten mittig (z. B. „Eigenschaften“ auf schmalen Bildschirmen). */
+  bottom?: ReactNode;
   children: ReactNode;
 }
 
 /** Container der Arbeitsfläche: Ansichtsumschalter oben, dezente Bedienhinweise unten. */
-export function Workspace({ viewMode, onViewModeChange, actions, trailing, notice, preview = false, onPreviewChange, children }: WorkspaceProps) {
+export function Workspace({ viewMode, onViewModeChange, actions, trailing, notice, preview = false, onPreviewChange, bottom, children }: WorkspaceProps) {
   const previewing = viewMode === '3d' && preview;
   return (
     <>
@@ -70,7 +72,8 @@ export function Workspace({ viewMode, onViewModeChange, actions, trailing, notic
           />
         )}
       </div>
-      <div className={styles.hint} aria-hidden="true" hidden={previewing}>
+      {bottom && <div className={styles.bottom}>{bottom}</div>}
+      <div className={styles.hint} aria-hidden="true" hidden={previewing || !!bottom}>
         {CONTROL_HINTS[viewMode].map(([action, key]) => (
           <span key={action}>
             <strong>{key}</strong> {action}

@@ -330,7 +330,8 @@ function readFurniture(value: unknown, room: RoomModel, shift: FloorPoint): Furn
     {
       id: value.id,
       type,
-      name: typeof value.name === 'string' ? value.name : FURNITURE_CATALOG[type].label,
+      // Beim Tippen bleiben Leerzeichen am Ende erhalten (Namen aus mehreren Wörtern); gespeichert wird bereinigt gelesen.
+      name: typeof value.name === 'string' ? value.name.trim() : FURNITURE_CATALOG[type].label,
       width: value.width,
       depth: value.depth,
       height: value.height,

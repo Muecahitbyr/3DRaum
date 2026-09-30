@@ -60,6 +60,12 @@
 
 .bar button {
   height: 32px;
+  gap: 6px;
+}
+
+.icon {
+  display: none;
+  flex-shrink: 0;
 }
 
 .notice {
@@ -98,13 +104,51 @@
   }
 }
 
-/* Schmale Arbeitsfläche (Tablet): nur Status-Punkt statt Name/Text. */
-@media (max-width: 1100px) {
+/* Ansichtsleiste rutscht unter die Projektleiste (Workspace.module.css) – Meldung darunter. */
+@container workspace (max-width: 1060px) {
+  .notice {
+    top: 100px;
+  }
+}
+
+/* Mittlere Arbeitsfläche: Name/Status kompakter. */
+@container workspace (max-width: 1000px) {
   .info {
+    max-width: 130px;
+  }
+}
+
+/* Schmale Arbeitsfläche: nur Symbole (Name und Status bleiben per Punkt/Tooltip erkennbar). */
+@container workspace (max-width: 760px) {
+  /* Name steht dann im Kopf der Sidebar; hier bleibt der Status-Punkt. */
+  .name,
+  .statusText {
     display: none;
   }
 
+  .info {
+    padding: 0 4px 0 2px;
+  }
+
   .bar {
-    padding-left: 3px;
+    padding-left: 6px;
+  }
+
+  .icon {
+    display: block;
+  }
+
+  .label {
+    display: none;
+  }
+
+  .bar button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .notice {
+    max-width: min(320px, calc(100vw - 32px));
   }
 }

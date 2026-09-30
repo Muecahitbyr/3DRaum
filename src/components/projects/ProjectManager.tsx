@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ProjectSession } from '../../hooks/useProjectSession';
+import { readProjectFile } from '../../export/files';
 import { cleanProjectName, DEFAULT_PROJECT_NAME } from '../../projects/format';
 import type { ProjectSummary } from '../../projects/storage';
 import { ROOM_SHAPE_LABELS } from '../../config/room';
@@ -13,6 +14,8 @@ const NOTICE_DURATION_MS = 4000;
 
 interface ProjectManagerProps {
   session: ProjectSession;
+  /** Export-Dialog öffnen (liegt in der App, weil er Szene und Ansicht braucht). */
+  onOpenExport: () => void;
   /** Der Plan wurde komplett ersetzt (Projekt geöffnet / neu) – z. B. Kamera neu einpassen. */
   onPlanReplaced: () => void;
   /** Ein Dialog ist offen – z. B. Tastenkürzel des Planers pausieren. */
@@ -20,7 +23,7 @@ interface ProjectManagerProps {
 }
 
 /** Projektleiste und alle Projekt-Dialoge (Speichern, Übersicht, Bestätigungen). */
-export function ProjectManager({ session, onPlanReplaced, onModalChange }: ProjectManagerProps) {
+export function ProjectManager({ session, onPlanReplaced, onModalChange, onOpenExport }: ProjectManagerProps) {
   const [dialog, setDialog] = useState<'projects' | 'save' | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -119,6 +122,37 @@ export function ProjectManager({ session, onPlanReplaced, onModalChange }: Proje
       },
     );
 
+  /** Datei erst vollständig prüfen – der aktuelle Plan bleibt bis dahin unangetastet. */
+  const importFile = async (file: File) => {
+    const parsed = await readProjectFile(file);
+    if (!parsed.ok) {
+      setListError(`„${file.name}“ kann nicht importiert werden: ${parsed.error}`);
+      return;
+    }
+    guardUnsaved(
+      {
+        title: 'Ungespeicherte Änderungen verwerfen?',
+        message: `„${name}“ hat ungespeicherte Änderungen. Beim Import von „${parsed.project.name}“ gehen sie verloren.`,
+        confirmLabel: 'Verwerfen und importieren',
+      },
+      () => {
+        const result = session.importProject(parsed.project);
+        if (!result.ok) {
+          setListError(result.error);
+          return;
+        }
+        setDialog(null);
+        onPlanReplaced();
+        const warnings = [...parsed.warnings, ...result.warnings];
+        setNotice(
+          warnings.length
+            ? { kind: 'warning', text: `„${parsed.project.name}“ importiert. ${warnings.join(' ')}` }
+            : { kind: 'success', text: `„${parsed.project.name}“ importiert und gespeichert.` },
+        );
+      },
+    );
+  };
+
   const deleteProject = (project: ProjectSummary) =>
     setConfirm({
       title: 'Projekt löschen?',
@@ -154,6 +188,7 @@ export function ProjectManager({ session, onPlanReplaced, onModalChange }: Proje
           refresh();
           setDialog('projects');
         }}
+        onOpenExport={onOpenExport}
       />
       {dialog === 'projects' && (
         <ProjectsDialog
@@ -164,6 +199,7 @@ export function ProjectManager({ session, onPlanReplaced, onModalChange }: Proje
           onRename={renameProject}
           onDelete={deleteProject}
           onNew={startNewProject}
+          onImport={(file) => void importFile(file)}
           onClose={() => setDialog(null)}
         />
       )}

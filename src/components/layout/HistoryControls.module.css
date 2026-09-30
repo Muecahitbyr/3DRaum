@@ -37,3 +37,10 @@
   color: var(--color-border-strong);
   cursor: default;
 }
+
+@media (pointer: coarse) {
+  .button {
+    width: 40px;
+    height: 40px;
+  }
+}

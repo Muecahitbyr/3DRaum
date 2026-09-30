@@ -39,11 +39,10 @@
   color: #fff;
 }
 
-/* Formular-Variante: volle Breite, gleich breite Optionen, ohne Schatten. */
+/* Formular-Variante: volle Breite, Optionen nach Textlänge verteilt (lange Begriffe wie
+   „Tageslicht“ bleiben lesbar), ohne Schatten. */
 .field {
-  display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
+  display: flex;
   width: 100%;
   background: var(--color-bg);
   backdrop-filter: none;
@@ -51,8 +50,22 @@
 }
 
 .field .option {
+  flex: 1 1 auto;
   min-width: 0;
   height: 30px;
-  padding: 0 8px;
+  padding: 0 4px;
+  overflow: hidden;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .option {
+    height: 40px;
+  }
+
+  .field .option {
+    height: 36px;
+  }
 }

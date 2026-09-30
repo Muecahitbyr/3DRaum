@@ -19,6 +19,9 @@ interface DialogProps {
  * Modaler Dialog: Esc/Klick daneben schließt, der Fokus springt beim Öffnen in den
  * Dialog (Element mit `data-autofocus` bzw. erstes Eingabefeld) und danach zurück.
  */
+const isVisible = (el: HTMLElement) => !el.hidden && el.offsetParent !== null;
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
 export function Dialog({ title, onClose, children, footer, width = 460, testId }: DialogProps) {
   const id = useId();
   const titleId = `${id}-title`;
@@ -32,13 +35,32 @@ export function Dialog({ title, onClose, children, footer, width = 460, testId }
     const previous = document.activeElement as HTMLElement | null;
     openDialogs.push(id);
     const panel = panelRef.current;
-    const initial = panel?.querySelector<HTMLElement>('[data-autofocus]') ?? panel?.querySelector<HTMLElement>('input') ?? panel;
+    // Erstes sichtbares Eingabefeld (nicht z. B. ein verstecktes Datei-Input).
+    const firstInput = [...(panel?.querySelectorAll<HTMLElement>('input, select, textarea') ?? [])].find(isVisible);
+    const initial = panel?.querySelector<HTMLElement>('[data-autofocus]') ?? firstInput ?? panel;
     initial?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || openDialogs[openDialogs.length - 1] !== id) return;
-      event.preventDefault();
-      onCloseRef.current();
+      if (openDialogs[openDialogs.length - 1] !== id) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      // Tab bleibt im Dialog (vom letzten zum ersten Element und umgekehrt).
+      if (event.key !== 'Tab' || !panel) return;
+      const focusable = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(isVisible);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !panel.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !panel.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {

@@ -156,3 +156,9 @@
   font-size: 12px;
   text-align: right;
 }
+
+@media (pointer: coarse) {
+  .color {
+    height: 40px;
+  }
+}

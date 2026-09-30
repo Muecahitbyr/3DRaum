@@ -42,3 +42,10 @@
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }
+
+@media (pointer: coarse) {
+  .button,
+  .center {
+    height: 40px;
+  }
+}

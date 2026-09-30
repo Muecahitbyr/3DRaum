@@ -3,6 +3,11 @@
   inset: 0;
 }
 
+/*
+ * Werkzeuge über der Arbeitsfläche: links Menü + Verlauf, Mitte Ansicht, rechts Projekt.
+ * Auf schmaler Fläche rückt die Ansichtsleiste in eine zweite Zeile, damit sich
+ * nichts überdeckt.
+ */
 .toolbar {
   position: absolute;
   top: 16px;
@@ -13,21 +18,24 @@
   transform: translateX(-50%);
 }
 
+.actions {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+}
+
 /* Vorschau: Werkzeuge treten zurück, bis die Maus darüber fährt. */
 .actions[data-preview='true'] {
   opacity: 0.45;
   transition: opacity 150ms ease;
 }
 
-.actions[data-preview='true']:hover {
+.actions[data-preview='true']:hover,
+.actions[data-preview='true']:focus-within {
   opacity: 1;
-}
-
-.actions {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 20;
 }
 
 .trailing {
@@ -61,22 +69,47 @@
   font-weight: 600;
 }
 
-@media (hover: none) {
+.bottom {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  z-index: 25;
+  transform: translateX(-50%);
+}
+
+@container workspace (max-width: 1060px) {
+  .toolbar {
+    top: 68px;
+  }
+}
+
+@container workspace (max-width: 900px) {
+  .hint {
+    display: none;
+  }
+}
+
+@container workspace (max-width: 480px) {
   .actions {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 20;
+    top: 12px;
+    left: 12px;
+    gap: 6px;
+  }
+
+  .trailing {
+    top: 12px;
+    right: 12px;
+  }
+
+  .toolbar {
+    top: 64px;
+    gap: 6px;
+  }
 }
 
-.trailing {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 30;
-}
-
-.hint {
+/* Touch-Geräte: keine Maus-Hinweise. */
+@media (hover: none) {
+  .hint {
     display: none;
   }
 }

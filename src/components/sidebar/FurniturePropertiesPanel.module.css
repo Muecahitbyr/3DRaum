@@ -45,3 +45,9 @@
   height: 28px;
   font-size: 12px;
 }
+
+@media (pointer: coarse) {
+  .group > button {
+    height: 40px;
+  }
+}

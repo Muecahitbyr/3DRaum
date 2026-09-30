@@ -64,7 +64,8 @@ export function normalizeFurniture(item: FurnitureItem, room: RoomModel): Furnit
   const sizeLimits = getFurnitureLimits(item, room);
   const sized = {
     ...item,
-    name: item.name.trim() || FURNITURE_CATALOG[item.type].label,
+    // Nicht am Ende kürzen: Namen werden live getippt („Sofa “ → „Sofa groß“).
+    name: item.name.trim() ? item.name.trimStart() : FURNITURE_CATALOG[item.type].label,
     width: fit(item.width, sizeLimits.width.min, sizeLimits.width.max),
     depth: fit(item.depth, sizeLimits.depth.min, sizeLimits.depth.max),
     height: fit(item.height, sizeLimits.height.min, sizeLimits.height.max),

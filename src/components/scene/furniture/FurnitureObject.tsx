@@ -1,6 +1,6 @@
 import { Edges, useCursor } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { SCENE_COLORS } from '../../../config/scene';
 import type { CollisionSeverity } from '../../../collision';
 import type { FurniturePickMode } from '../../../state/plannerState';
@@ -36,7 +36,11 @@ interface FurnitureObjectProps {
   onPick: (id: string, mode: FurniturePickMode) => void;
 }
 
-export function FurnitureObject({ item, room, variant, selected, soleSelection, moveIds, status, onPick }: FurnitureObjectProps) {
+/**
+ * Ein Möbel in der Szene. Memoisiert: Beim Ziehen eines Möbels rendern nur das gezogene
+ * und Möbel mit geändertem Zustand neu (unveränderte Möbel behalten ihre Objektidentität).
+ */
+export const FurnitureObject = memo(function FurnitureObject({ item, room, variant, selected, soleSelection, moveIds, status, onPick }: FurnitureObjectProps) {
   const isPlan = variant === 'plan';
   const interaction = useFurnitureInteraction();
   const [hovered, setHovered] = useState(false);
@@ -107,4 +111,4 @@ export function FurnitureObject({ item, room, variant, selected, soleSelection, 
       )}
     </group>
   );
-}
+});

@@ -8,7 +8,7 @@
   border-radius: 999px;
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font: 600 11px/1 system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

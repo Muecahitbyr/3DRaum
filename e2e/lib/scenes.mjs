@@ -165,3 +165,33 @@ export function freeRoom() {
     },
   });
 }
+
+export function office() {
+  n = 0;
+  return project('buero', 'Büro', {
+    walls: rectangleWalls(4.5, 3.6, 2.7),
+    height: 2.7,
+    openings: [
+      { id: 'opening-1', type: 'window', wall: 'north', offset: 0.9, width: 2, height: 1.5, sillHeight: 0.8, sashes: 2 },
+      { id: 'opening-2', type: 'door', wall: 'south', offset: 0.35, width: 0.9, height: 2.1, hinge: 'right', swing: 'inward' },
+    ],
+    furniture: [
+      item('desk', 'Schreibtisch', 1.9, 0.6, 0, [1.6, 0.8, 0.75], { colors: { main: '#f2f0ec', wood: '#8a6a4b' } }),
+      item('office-chair', 'Bürostuhl', 1.9, 1.45, 180, [0.65, 0.65, 1.1], { colors: { fabric: '#2f3540' } }),
+      item('shelf', 'Aktenregal', 4.3, 1.5, 90, [0.8, 0.35, 1.8]),
+      item('dresser', 'Rollcontainer', 3.05, 0.5, 0, [0.45, 0.55, 0.6], { colors: { main: '#dfe3e6' } }),
+      item('armchair', 'Lesesessel', 0.75, 2.85, 45, [0.85, 0.85, 0.85], { colors: { fabric: '#4f7a6a' } }),
+      item('floor-lamp', 'Leselampe', 0.3, 2.0, 0, [0.4, 0.4, 1.6], lamp(true, 1, 3000)),
+      item('ceiling-light', 'Deckenleuchte', 2.25, 1.8, 0, [0.6, 0.6, 0.1], lamp(true, 1.1, 4000)),
+    ],
+    fixtures: [
+      { id: 'fixture-1', type: 'radiator', wall: 'north', offset: 1.4, width: 1, height: 0.5, depth: 0.1, elevation: 0.15 },
+      { id: 'fixture-2', type: 'socket', wall: 'west', offset: 0.8, width: 0.08, height: 0.08, depth: 0.012, elevation: 0.3 },
+    ],
+    design: {
+      floor: 'oak',
+      wallColors: { north: '#f4f1ec', east: '#dfe6ea', south: '#f4f1ec', west: '#f4f1ec' },
+      lighting: { preset: 'neutral', brightness: 1 },
+    },
+  });
+}

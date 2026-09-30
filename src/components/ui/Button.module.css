@@ -72,3 +72,14 @@
 .block {
   width: 100%;
 }
+
+/* Touch-Geräte: ausreichend große Bedienflächen. */
+@media (pointer: coarse) {
+  .button {
+    min-height: 40px;
+  }
+
+  .icon {
+    min-width: 40px;
+  }
+}

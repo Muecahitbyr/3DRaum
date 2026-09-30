@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import { SCENE_COLORS } from '../../config/scene';
-import type { CollisionReport } from '../../collision';
+import type { CollisionReport, CollisionSeverity } from '../../collision';
 import type { FurniturePickMode } from '../../state/plannerState';
 import type { RoomDesign } from '../../types/design';
 import type { FixturePatch, RoomFixture } from '../../types/fixture';
@@ -27,11 +27,14 @@ import { PerspectiveView } from './PerspectiveView';
 import { Room } from './room/Room';
 import { SceneGrid } from './SceneGrid';
 import { LampLights } from './LampLights';
+import { SceneCapture, type SceneCaptureApi } from './SceneCapture';
 import { SceneLights } from './SceneLights';
 import { TopView } from './TopView';
 
 interface PlannerCanvasProps {
   room: RoomModel;
+  /** Export: Zugriff auf die Aufnahme der aktuellen Ansicht. */
+  onCaptureReady?: (api: SceneCaptureApi | null) => void;
   /** Grundriss-Editor aktiv (nur in 2D wirksam). */
   roomEditing: boolean;
   selectedWallId: string | null;
@@ -78,8 +81,11 @@ interface PlannerCanvasProps {
  * gemountet; der Ansichtsmodus bestimmt nur, welche Kamera/Steuerung aktiv ist.
  * So bleibt z. B. die 3D-Kameraposition beim Wechsel 2D ↔ 3D erhalten.
  */
+const NO_SEVERITY: ReadonlyMap<string, CollisionSeverity> = new Map();
+
 export function PlannerCanvas({
   room,
+  onCaptureReady,
   roomEditing,
   selectedWallId,
   selectedCornerId,
@@ -181,7 +187,7 @@ export function PlannerCanvas({
           selectedOpeningId={selectedOpeningId}
           fixtures={fixtures}
           selectedFixtureId={selectedFixtureId}
-          severityById={collisions.severityById}
+          severityById={previewing ? NO_SEVERITY : collisions.severityById}
           onSelectOpening={onSelectOpening}
           onSelectFixture={onSelectFixture}
           preview={previewing}
@@ -216,7 +222,8 @@ export function PlannerCanvas({
           room={room}
           variant={isPlan ? 'plan' : 'model'}
           selectedIds={selectedFurnitureIds}
-          severityById={collisions.severityById}
+          // Vorschau realistisch: keine Kollisionsrahmen (Hinweise bleiben in der Seitenleiste).
+          severityById={previewing ? NO_SEVERITY : collisions.severityById}
           onPick={onPickFurniture}
         />
         {isPlan && (
@@ -253,6 +260,7 @@ export function PlannerCanvas({
           </>
         )}
       />
+      {onCaptureReady && <SceneCapture onReady={onCaptureReady} />}
       {import.meta.env.DEV && <DevSceneBridge />}
     </Canvas>
   );

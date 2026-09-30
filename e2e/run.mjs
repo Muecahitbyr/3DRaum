@@ -46,6 +46,12 @@ const SUITES = [
   { file: 'suites/lamps.mjs', name: 'Lampen & Möbelfarben', server: 'dev' },
   { file: 'suites/visual-scenes.mjs', name: 'Visuelle Szenen', server: 'dev' },
   { file: 'suites/performance.mjs', name: 'Performance (Rerenders)', server: 'dev' },
+  { file: 'suites/export.mjs', name: 'Export (PNG, PDF, Projektdatei)', server: 'dev' },
+  { file: 'suites/mobile.mjs', name: 'Mobile, Tablet & Touch', server: 'dev' },
+  { file: 'suites/robustness.mjs', name: 'Fehlerbehandlung & Robustheit', server: 'dev' },
+  { file: 'suites/accessibility.mjs', name: 'Accessibility', server: 'dev' },
+  { file: 'suites/migrations.mjs', name: 'Speicherkompatibilität (Format 1–5)', server: 'dev' },
+  { file: 'suites/visual-final.mjs', name: 'Visuelle Endabnahme (5 Projekte × 3 Geräte)', server: 'dev' },
 ];
 
 const args = process.argv.slice(2);

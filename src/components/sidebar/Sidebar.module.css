@@ -37,3 +37,38 @@
   gap: 4px;
   padding: 8px 0;
 }
+
+.titles {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.project {
+  overflow: hidden;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--color-bg);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--color-accent);
+}

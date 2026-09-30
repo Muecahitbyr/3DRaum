@@ -10,8 +10,18 @@ import type { FloorPoint } from '../../types/room';
 import type { RoomModel } from '../../utils/room/model';
 import { resetOrbitControls } from '../../utils/orbitControls';
 
-
 const PREVIEW_FOV = 60;
+/** Hochformat (Smartphone/Tablet): mindestens so viel horizontaler Blickwinkel … */
+const PREVIEW_MIN_HORIZONTAL_FOV = 62;
+/** … bei höchstens diesem vertikalen Blickwinkel. */
+const PREVIEW_MAX_FOV = 90;
+
+/** Vertikales Sichtfeld der Vorschau: 60° im Querformat, im Hochformat breiter. */
+function previewFov(aspect: number): number {
+  const toRad = Math.PI / 180;
+  const needed = (2 * Math.atan(Math.tan((PREVIEW_MIN_HORIZONTAL_FOV / 2) * toRad) / Math.max(aspect, 1e-3))) / toRad;
+  return Math.min(PREVIEW_MAX_FOV, Math.max(PREVIEW_FOV, needed));
+}
 const NO_OBSTACLES: readonly (readonly FloorPoint[])[] = [];
 
 interface PerspectiveViewProps {
@@ -60,6 +70,9 @@ export function PerspectiveView({ active, fitShape, fitToken, preview = false, r
   const saved = useRef<{ position: Vector3; target: Vector3 } | null>(null);
   const roomRef = useRef(room);
   roomRef.current = room;
+  const aspect = size.height > 0 ? size.width / size.height : 1;
+  const aspectRef = useRef(aspect);
+  aspectRef.current = aspect;
   useLayoutEffect(() => {
     const controls = controlsRef.current;
     if (!camera) return;
@@ -67,7 +80,7 @@ export function PerspectiveView({ active, fitShape, fitToken, preview = false, r
       if (!saved.current) saved.current = { position: camera.position.clone(), target: controls?.target.clone() ?? new Vector3() };
       const pose = previewPose(roomRef.current, obstaclesRef.current);
       // Weiterer Blickwinkel auf Augenhöhe (Innenraum).
-      camera.fov = PREVIEW_FOV;
+      camera.fov = previewFov(aspectRef.current);
       camera.updateProjectionMatrix();
       resetOrbitControls(controls, () => {
         camera.position.set(...pose.position);
@@ -86,6 +99,13 @@ export function PerspectiveView({ active, fitShape, fitToken, preview = false, r
       });
     }
   }, [preview, camera]);
+
+  // Vorschau: Sichtfeld folgt dem Seitenverhältnis (z. B. Drehen des Geräts).
+  useLayoutEffect(() => {
+    if (!preview || !camera) return;
+    camera.fov = previewFov(aspect);
+    camera.updateProjectionMatrix();
+  }, [preview, camera, aspect]);
 
   // Vorschau: Kamera und Drehzentrum bleiben im Raum (keine React-Updates – direkt im Frame).
   useFrame(() => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { DEFAULT_PLAN, DEFAULT_PROJECT_NAME } from '../projects/format';
+import { DEFAULT_PLAN, DEFAULT_PROJECT_NAME, type ProjectFile } from '../projects/format';
 import { deleteProject, listProjects, loadProject, renameProject, saveProject } from '../projects/storage';
 import { sameDocument, type PlanDocument } from '../state/history';
 import type { RoomShape } from '../types/room';
@@ -81,6 +81,28 @@ export function useProjectSession(document: PlanDocument, load: (plan: PlanDocum
     [load],
   );
 
+  /**
+   * Geprüftes Projekt aus einer Datei übernehmen: als NEUES lokales Projekt speichern
+   * (nie ein bestehendes überschreiben) und öffnen. Ist der lokale Speicher voll,
+   * wird es trotzdem geöffnet – dann als ungespeichertes Projekt.
+   */
+  const importProject = useCallback(
+    (project: ProjectFile): ProjectResult => {
+      const saved = saveProject({ name: project.name, plan: project.plan });
+      load(project.plan);
+      setSavedAt(null);
+      if (!saved.ok) {
+        setCurrent(null);
+        setSavedPlan(DEFAULT_PLAN);
+        return { ok: true, warnings: [`Nicht lokal gespeichert: ${saved.error}`] };
+      }
+      setCurrent({ id: saved.value.id, name: saved.value.name });
+      setSavedPlan(project.plan);
+      return { ok: true, warnings: [] };
+    },
+    [load],
+  );
+
   const rename = useCallback(
     (id: string, name: string): ProjectResult => {
       const result = renameProject(id, name);
@@ -106,7 +128,7 @@ export function useProjectSession(document: PlanDocument, load: (plan: PlanDocum
     [current],
   );
 
-  return { current, dirty, savedAt, save, open, startNew, rename, remove, list: listProjects };
+  return { current, dirty, savedAt, save, open, startNew, importProject, rename, remove, list: listProjects };
 }
 
 export type ProjectSession = ReturnType<typeof useProjectSession>;
