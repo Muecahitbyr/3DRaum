@@ -1,0 +1,43 @@
+.info {
+  margin: -4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.hint {
+  margin: -4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.actions > button {
+  padding-inline: 6px;
+  font-size: 12px;
+}

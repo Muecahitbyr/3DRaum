@@ -1,0 +1,82 @@
+.viewport {
+  position: absolute;
+  inset: 0;
+}
+
+.toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+  transform: translateX(-50%);
+}
+
+/* Vorschau: Werkzeuge treten zurück, bis die Maus darüber fährt. */
+.actions[data-preview='true'] {
+  opacity: 0.45;
+  transition: opacity 150ms ease;
+}
+
+.actions[data-preview='true']:hover {
+  opacity: 1;
+}
+
+.actions {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+}
+
+.trailing {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 30;
+}
+
+.hint {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  gap: 14px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hint strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+@media (hover: none) {
+  .actions {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+}
+
+.trailing {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 30;
+}
+
+.hint {
+    display: none;
+  }
+}

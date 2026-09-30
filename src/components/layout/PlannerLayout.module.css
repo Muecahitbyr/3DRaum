@@ -1,0 +1,33 @@
+.layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+}
+
+.sidebar {
+  min-height: 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+  z-index: 1;
+}
+
+.workspace {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Fallback für schmale Geräte: Sidebar oben, Arbeitsfläche darunter. */
+@media (max-width: 640px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .sidebar {
+    max-height: 45dvh;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+}

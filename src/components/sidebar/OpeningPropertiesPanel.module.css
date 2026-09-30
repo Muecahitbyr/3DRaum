@@ -1,0 +1,24 @@
+.name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.footer {
+  padding-top: 4px;
+}
+
+.hint {
+  margin: -4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}

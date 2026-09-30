@@ -1,0 +1,54 @@
+.anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.stem {
+  position: absolute;
+  left: -0.75px;
+  width: 1.5px;
+  background: var(--color-accent);
+  opacity: 0.7;
+}
+
+.knob {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  transition: transform 100ms ease;
+}
+
+.knob:hover,
+.active .knob {
+  transform: scale(1.15);
+}
+
+.active .knob {
+  cursor: grabbing;
+  background: var(--color-accent);
+}
+
+.angle {
+  position: absolute;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-text);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+}

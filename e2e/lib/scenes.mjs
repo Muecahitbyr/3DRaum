@@ -1,0 +1,167 @@
+/**
+ * Testszenen als Projektdateien (Format 5). Werden in den lokalen Speicher geschrieben
+ * und über „Projekte“ geöffnet – deterministisch und schnell, ohne Klickstrecken.
+ */
+
+const wall = (id, start, end, height = 2.6, thickness = 0.15) => ({ id, start: { x: start[0], z: start[1] }, end: { x: end[0], z: end[1] }, height, thickness });
+
+export function rectangleWalls(width, length, height = 2.6) {
+  return [
+    wall('north', [0, 0], [width, 0], height),
+    wall('east', [width, 0], [width, length], height),
+    wall('south', [width, length], [0, length], height),
+    wall('west', [0, length], [0, 0], height),
+  ];
+}
+
+export function polygonWalls(corners, height = 2.6) {
+  return corners.map((c, i) => wall(`wall-${i + 1}`, c, corners[(i + 1) % corners.length], height));
+}
+
+let n = 0;
+export const item = (type, name, x, z, rotationDeg, size, extra = {}) => ({
+  id: `furniture-${++n}`,
+  type,
+  name,
+  width: size[0],
+  depth: size[1],
+  height: size[2],
+  position: { x, z },
+  rotationDeg,
+  ...extra,
+});
+
+export function project(id, name, { shape = 'rectangle', walls, height = 2.6, openings = [], furniture = [], fixtures = [], design }) {
+  return {
+    format: 'raumplaner-project',
+    version: 5,
+    id,
+    name,
+    createdAt: '2026-06-01T10:00:00.000Z',
+    updatedAt: '2026-06-01T10:00:00.000Z',
+    plan: {
+      room: { shape, height, walls },
+      openings,
+      furniture,
+      fixtures,
+      groups: [],
+      design: {
+        floor: 'oak',
+        wallColors: Object.fromEntries(walls.map((w) => [w.id, '#f4f1ec'])),
+        wallFinishes: {},
+        ceilingColor: '#ffffff',
+        lighting: { preset: 'daylight', brightness: 1 },
+        ...design,
+      },
+    },
+  };
+}
+
+/** Projekt speichern und öffnen (Projektübersicht). */
+export async function openScene(page, data) {
+  await page.evaluate((data) => localStorage.setItem(`raumplaner:project:${data.id}`, JSON.stringify(data)), data);
+  await page.getByTestId('projects-button').click();
+  await page.waitForTimeout(200);
+  await page.locator(`[data-project-id="${data.id}"]`).getByTestId('project-open').click();
+  await page.waitForTimeout(250);
+  // Ungespeicherte Änderungen verwerfen (Testszenen ersetzen den Plan bewusst).
+  if (await page.getByTestId('confirm-accept').count()) await page.getByTestId('confirm-accept').click();
+  await page.waitForTimeout(900);
+}
+
+const lamp = (on = true, intensity = 1, temperature = 2700) => ({ light: { on, intensity, temperature } });
+
+export function livingRoom(preset = 'daylight', brightness = 1) {
+  n = 0;
+  return project(`wohnzimmer-${preset}`, `Wohnzimmer ${preset}`, {
+    walls: rectangleWalls(5.5, 4.5),
+    openings: [
+      { id: 'opening-1', type: 'window', wall: 'north', offset: 1.1, width: 1.6, height: 1.4, sillHeight: 0.8, sashes: 2 },
+      { id: 'opening-2', type: 'window', wall: 'east', offset: 1.2, width: 1.2, height: 1.4, sillHeight: 0.8, sashes: 1 },
+      { id: 'opening-3', type: 'door', wall: 'south', offset: 4.2, width: 0.9, height: 2.1, hinge: 'left', swing: 'inward' },
+    ],
+    furniture: [
+      item('sofa', 'Sofa', 2.9, 3.95, 180, [2.2, 0.95, 0.85], { colors: { fabric: '#8c9097' } }),
+      item('coffee-table', 'Couchtisch', 2.9, 2.75, 0, [1.1, 0.6, 0.42]),
+      item('armchair', 'Sessel', 4.7, 2.9, 90, [0.85, 0.85, 0.85], { colors: { fabric: '#b88657' } }),
+      item('tv-board', 'TV-Board', 2.9, 0.22, 0, [1.8, 0.42, 0.5], { colors: { main: '#e9e4dc' } }),
+      item('shelf', 'Regal', 0.2, 1.4, 270, [0.8, 0.35, 1.8]),
+      item('floor-lamp', 'Stehlampe', 1.58, 4.05, 0, [0.4, 0.4, 1.6], lamp(true, 1)),
+      item('ceiling-light', 'Deckenleuchte', 2.75, 2.25, 0, [0.5, 0.5, 0.12], lamp(true, 1, 3000)),
+    ],
+    fixtures: [{ id: 'fixture-1', type: 'radiator', wall: 'east', offset: 1.3, width: 1, height: 0.5, depth: 0.1, elevation: 0.15 }],
+    design: {
+      floor: 'oak',
+      wallColors: { north: '#f4f1ec', east: '#f4f1ec', south: '#f4f1ec', west: '#b8c6ae' },
+      wallFinishes: { west: 'plaster' },
+      lighting: { preset, brightness },
+    },
+  });
+}
+
+export function bedroom() {
+  n = 0;
+  return project('schlafzimmer', 'Schlafzimmer', {
+    walls: rectangleWalls(4.2, 4),
+    openings: [
+      { id: 'opening-1', type: 'window', wall: 'east', offset: 1.4, width: 1.2, height: 1.3, sillHeight: 0.9, sashes: 1 },
+      { id: 'opening-2', type: 'door', wall: 'south', offset: 0.3, width: 0.85, height: 2.1, hinge: 'right', swing: 'inward' },
+    ],
+    furniture: [
+      item('double-bed', 'Doppelbett', 2.1, 1.1, 90, [2.1, 1.8, 0.5], { colors: { fabric: '#d8cfc2', wood: '#8a6a4b' } }),
+      item('nightstand', 'Nachttisch links', 0.85, 0.25, 0, [0.45, 0.4, 0.55]),
+      item('nightstand', 'Nachttisch rechts', 3.35, 0.25, 0, [0.45, 0.4, 0.55]),
+      item('table-lamp', 'Tischlampe links', 0.85, 0.25, 0, [0.28, 0.28, 0.45], { ...lamp(true, 1, 2700), elevation: 0.55 }),
+      item('table-lamp', 'Tischlampe rechts', 3.35, 0.25, 0, [0.28, 0.28, 0.45], { ...lamp(true, 1, 2700), elevation: 0.55 }),
+      item('pendant-light', 'Pendelleuchte', 2.1, 1.6, 0, [0.45, 0.45, 0.8], lamp(true, 0.8, 2700)),
+      item('wardrobe', 'Schrank', 0.35, 3.1, 270, [1.6, 0.6, 2.1], { colors: { main: '#dfe3e6' } }),
+    ],
+    design: {
+      floor: 'carpet-light',
+      wallColors: { north: '#e7dccd', east: '#f4f1ec', south: '#f4f1ec', west: '#f4f1ec' },
+      lighting: { preset: 'warm', brightness: 0.8 },
+    },
+  });
+}
+
+export function lRoom() {
+  n = 0;
+  return project('l-raum', 'L-Raum Essbereich', {
+    shape: 'l-shape',
+    walls: polygonWalls([[0, 0], [6, 0], [6, 3], [3.5, 3], [3.5, 5], [0, 5]]),
+    openings: [{ id: 'opening-1', type: 'window', wall: 'wall-1', offset: 3.6, width: 1.6, height: 1.4, sillHeight: 0.8, sashes: 2 }],
+    furniture: [
+      item('table', 'Esstisch', 4.4, 1.5, 0, [1.6, 0.9, 0.75], { colors: { wood: '#a57c52' } }),
+      item('chair', 'Stuhl 1', 4.0, 0.75, 0, [0.45, 0.52, 0.9]),
+      item('chair', 'Stuhl 2', 4.8, 0.75, 0, [0.45, 0.52, 0.9]),
+      item('chair', 'Stuhl 3', 4.0, 2.25, 180, [0.45, 0.52, 0.9]),
+      item('chair', 'Stuhl 4', 4.8, 2.25, 180, [0.45, 0.52, 0.9]),
+      item('pendant-light', 'Pendelleuchte', 4.4, 1.5, 0, [0.4, 0.4, 1.0], lamp(true, 1, 2700)),
+      item('sofa', 'Sofa', 1.7, 4.4, 180, [2, 0.9, 0.85]),
+      item('floor-lamp', 'Stehlampe', 0.35, 4.6, 0, [0.4, 0.4, 1.6], lamp(true, 1)),
+    ],
+    design: { floor: 'herringbone', lighting: { preset: 'neutral', brightness: 1 } },
+  });
+}
+
+export function freeRoom() {
+  n = 0;
+  return project('freie-form', 'Freie Form', {
+    shape: 'free',
+    walls: polygonWalls([[0, 0], [5, 0], [5, 2.5], [3.5, 4], [0, 4]]),
+    openings: [{ id: 'opening-1', type: 'window', wall: 'wall-3', offset: 0.4, width: 1.2, height: 1.3, sillHeight: 0.9, sashes: 1 }],
+    furniture: [
+      item('desk', 'Schreibtisch', 1.2, 0.4, 0, [1.4, 0.7, 0.75]),
+      item('office-chair', 'Bürostuhl', 1.2, 1.1, 180, [0.65, 0.65, 1.1], { colors: { fabric: '#9b4a3c' } }),
+      item('shelf', 'Regal', 4.8, 1.2, 90, [0.8, 0.35, 1.8]),
+      item('floor-lamp', 'Stehlampe', 3.2, 3.4, 0, [0.4, 0.4, 1.6], lamp(true, 1.2, 3500)),
+      item('ceiling-light', 'Deckenleuchte', 2.4, 2, 0, [0.6, 0.6, 0.1], lamp(true, 1, 4000)),
+    ],
+    design: {
+      floor: 'tiles-large-dark',
+      wallColors: { 'wall-1': '#d7d5d0', 'wall-2': '#d7d5d0', 'wall-3': '#d7d5d0', 'wall-4': '#d7d5d0', 'wall-5': '#d7d5d0' },
+      wallFinishes: { 'wall-1': 'concrete', 'wall-2': 'concrete', 'wall-3': 'concrete', 'wall-4': 'concrete', 'wall-5': 'concrete' },
+      lighting: { preset: 'cool', brightness: 1 },
+    },
+  });
+}

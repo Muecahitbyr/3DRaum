@@ -1,0 +1,183 @@
+import { useCallback, useEffect, useState } from 'react';
+import type { ProjectSession } from '../../hooks/useProjectSession';
+import { cleanProjectName, DEFAULT_PROJECT_NAME } from '../../projects/format';
+import type { ProjectSummary } from '../../projects/storage';
+import { ROOM_SHAPE_LABELS } from '../../config/room';
+import type { RoomShape } from '../../types/room';
+import { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog';
+import { ProjectBar, type ProjectNotice, type ProjectStatus } from './ProjectBar';
+import { ProjectsDialog } from './ProjectsDialog';
+import { SaveProjectDialog } from './SaveProjectDialog';
+
+const NOTICE_DURATION_MS = 4000;
+
+interface ProjectManagerProps {
+  session: ProjectSession;
+  /** Der Plan wurde komplett ersetzt (Projekt geöffnet / neu) – z. B. Kamera neu einpassen. */
+  onPlanReplaced: () => void;
+  /** Ein Dialog ist offen – z. B. Tastenkürzel des Planers pausieren. */
+  onModalChange: (open: boolean) => void;
+}
+
+/** Projektleiste und alle Projekt-Dialoge (Speichern, Übersicht, Bestätigungen). */
+export function ProjectManager({ session, onPlanReplaced, onModalChange }: ProjectManagerProps) {
+  const [dialog, setDialog] = useState<'projects' | 'save' | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [listError, setListError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<ProjectNotice | null>(null);
+
+  const modalOpen = dialog !== null || confirm !== null;
+  useEffect(() => onModalChange(modalOpen), [modalOpen, onModalChange]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), notice.kind === 'error' ? NOTICE_DURATION_MS * 2 : NOTICE_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  const name = session.current?.name ?? DEFAULT_PROJECT_NAME;
+  const status: ProjectStatus = session.dirty ? 'dirty' : session.current ? 'saved' : 'new';
+
+  const refresh = useCallback(() => {
+    const result = session.list();
+    setProjects(result.ok ? result.value : []);
+    setListError(result.ok ? null : result.error);
+  }, [session]);
+
+  const saveAs = useCallback(
+    (newName?: string) => {
+      const result = session.save(newName);
+      const savedName = cleanProjectName(newName ?? session.current?.name);
+      setNotice(result.ok ? { kind: 'success', text: `„${savedName}“ gespeichert.` } : { kind: 'error', text: result.error });
+    },
+    [session],
+  );
+
+  // Bestehendes Projekt direkt speichern, neues zuerst benennen.
+  const handleSave = useCallback(() => {
+    if (session.current) saveAs();
+    else setDialog('save');
+  }, [session, saveAs]);
+
+  // Strg/⌘ + S speichert (statt „Seite speichern“ des Browsers).
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
+      event.preventDefault();
+      if (!modalOpen) handleSave();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleSave, modalOpen]);
+
+  /** Führt eine Aktion aus, die den Plan ersetzt – bei ungespeicherten Änderungen erst nach Rückfrage. */
+  const guardUnsaved = (request: Omit<ConfirmRequest, 'onConfirm' | 'danger'>, action: () => void) => {
+    if (session.dirty) setConfirm({ ...request, danger: true, onConfirm: action });
+    else action();
+  };
+
+  const openProject = (project: ProjectSummary) =>
+    guardUnsaved(
+      {
+        title: 'Ungespeicherte Änderungen verwerfen?',
+        message: `„${name}“ hat ungespeicherte Änderungen. Beim Öffnen von „${project.name}“ gehen sie verloren.`,
+        confirmLabel: 'Verwerfen und öffnen',
+      },
+      () => {
+        const result = session.open(project.id);
+        if (!result.ok) {
+          setListError(`„${project.name}“ konnte nicht geöffnet werden: ${result.error}`);
+          refresh();
+          return;
+        }
+        setDialog(null);
+        onPlanReplaced();
+        setNotice(
+          result.warnings.length
+            ? { kind: 'warning', text: `„${project.name}“ geöffnet. ${result.warnings.join(' ')}` }
+            : { kind: 'success', text: `„${project.name}“ geöffnet.` },
+        );
+      },
+    );
+
+  const startNewProject = (shape: RoomShape) =>
+    guardUnsaved(
+      {
+        title: 'Neues Projekt beginnen?',
+        message: `„${name}“ hat ungespeicherte Änderungen. Sie gehen verloren, wenn ein neues Projekt begonnen wird.`,
+        confirmLabel: 'Verwerfen und neu beginnen',
+      },
+      () => {
+        session.startNew(shape);
+        setDialog(null);
+        onPlanReplaced();
+        setNotice({
+          kind: 'success',
+          text: shape === 'rectangle' ? 'Neues Projekt mit Standardraum gestartet.' : `Neues Projekt mit ${ROOM_SHAPE_LABELS[shape]} gestartet.`,
+        });
+      },
+    );
+
+  const deleteProject = (project: ProjectSummary) =>
+    setConfirm({
+      title: 'Projekt löschen?',
+      message: `„${project.name}“ wird dauerhaft aus diesem Browser gelöscht.`,
+      confirmLabel: 'Löschen',
+      danger: true,
+      onConfirm: () => {
+        const result = session.remove(project.id);
+        if (!result.ok) setListError(result.error);
+        refresh();
+      },
+    });
+
+  const renameProject = (project: ProjectSummary, newName: string) => {
+    const result = session.rename(project.id, newName);
+    if (!result.ok) {
+      setListError(result.error);
+      return false;
+    }
+    refresh();
+    return true;
+  };
+
+  return (
+    <>
+      <ProjectBar
+        name={name}
+        status={status}
+        savedAt={session.savedAt}
+        notice={notice}
+        onSave={handleSave}
+        onOpenProjects={() => {
+          refresh();
+          setDialog('projects');
+        }}
+      />
+      {dialog === 'projects' && (
+        <ProjectsDialog
+          projects={projects}
+          currentId={session.current?.id ?? null}
+          error={listError}
+          onOpen={openProject}
+          onRename={renameProject}
+          onDelete={deleteProject}
+          onNew={startNewProject}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'save' && (
+        <SaveProjectDialog
+          initialName=""
+          onSave={(newName) => {
+            setDialog(null);
+            saveAs(newName);
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {confirm && <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />}
+    </>
+  );
+}
