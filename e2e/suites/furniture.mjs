@@ -79,7 +79,14 @@ for (const [type, [name, w, d, h, minMeshes]] of Object.entries(defaults)) {
   const i = await info(idOf[type]);
   check(`${name}: hinzugefügt & ausgewählt`, (await selectedFurniture()) === name && (await props.getByTestId('furniture-type').textContent()).includes(name.split(' ')[0]));
   check(`${name}: Standardmaße ${w} × ${d} × ${h}`, (await val('Breite')) === w && (await val('Tiefe')) === d && (await val('Höhe')) === h);
-  check(`${name}: mittig im Raum (2,50 / 2,00, 0°)`, (await val('X-Position')) === '2,50' && (await val('Z-Position')) === '2,00' && (await val('Rotation')) === '0' && near(i.pos[0], 0) && near(i.pos[1], 0));
+  // V1.1: Das erste Möbel steht in der Raummitte, jedes weitere auf dem nächsten freien Platz
+  // (vorher lagen alle exakt übereinander in der Mitte).
+  if (Object.keys(idOf).length === 1) {
+    check(`${name}: mittig im Raum (2,50 / 2,00, 0°)`, (await val('X-Position')) === '2,50' && (await val('Z-Position')) === '2,00' && (await val('Rotation')) === '0' && near(i.pos[0], 0) && near(i.pos[1], 0));
+  } else {
+    const marked = await page.locator('[data-testid="furniture-list-item"] [data-severity]').count();
+    check(`${name}: auf freiem Platz (keine Kollision mit den übrigen Möbeln, 0°)`, marked === 0 && (await val('Rotation')) === '0', `${await val('X-Position')} / ${await val('Z-Position')}, ${marked} markiert`);
+  }
   const [W, D, H] = [w, d, h].map((x) => Number(x.replace(',', '.')));
   check(`${name}: 3D-Modell entspricht exakt den Außenmaßen (B×H×T)`, near(i.size[0], W, 0.002) && near(i.size[1], H, 0.002) && near(i.size[2], D, 0.002), i.size.map((x) => x.toFixed(3)).join(' × '));
   check(`${name}: erkennbares Modell aus ≥ ${minMeshes} Bauteilen`, i.meshes >= minMeshes, `${i.meshes} Bauteile`);

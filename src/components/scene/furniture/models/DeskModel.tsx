@@ -1,23 +1,17 @@
 import { FURNITURE_COLORS as C } from '../../../../config/furniture';
+import { deskGeometry } from '../../../../config/furnitureGeometry';
 import { Part, colorOf, derivedOf } from './parts';
 import type { FurnitureModelProps } from './types';
-
-const TOP = 0.03;
-const SIDE = 0.025;
-const FRONT = 0.018;
-const HANDLE = 0.012;
 
 /** Schreibtisch: Platte, Seitenwange links, Schubladen-Container rechts, Sichtblende hinten. */
 export function DeskModel({ width: w, depth: d, height: h, colors }: FurnitureModelProps) {
   const top = colorOf(colors, 'wood', C.oak);
   const body = colorOf(colors, 'main', C.lacquer);
   const front = derivedOf(colors, 'main', C.lacquerFront, 0.1);
-  const under = h - TOP;
-  const pw = Math.min(0.42, w * 0.32);
-  const pedestalDepth = d - 0.03 - FRONT - HANDLE;
+  // Maße gemeinsam mit den Kollisionszonen (Bürostuhl passt zwischen Wange und Container).
+  const { top: TOP, side: SIDE, front: FRONT, handle: HANDLE, under, pedestalWidth: pw, pedestalDepth, panelH, panelFromBack, panelT } = deskGeometry(w, d, h);
   const px = w / 2 - pw / 2;
   const drawers = 3;
-  const panelH = under * 0.45;
   return (
     <group>
       <Part position={[0, h - TOP / 2, 0]} size={[w, TOP, d]} color={top} roughness={0.55} />
@@ -33,7 +27,7 @@ export function DeskModel({ width: w, depth: d, height: h, colors }: FurnitureMo
           </group>
         );
       })}
-      <Part position={[(-w / 2 + SIDE + (w / 2 - pw)) / 2, under - panelH / 2, -d / 2 + 0.05]} size={[w - pw - SIDE, panelH, 0.015]} color={body} />
+      <Part position={[(-w / 2 + SIDE + (w / 2 - pw)) / 2, under - panelH / 2, -d / 2 + panelFromBack]} size={[w - pw - SIDE, panelH, panelT]} color={body} />
     </group>
   );
 }

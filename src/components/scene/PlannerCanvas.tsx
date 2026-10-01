@@ -8,6 +8,7 @@ import type { FixturePatch, RoomFixture } from '../../types/fixture';
 import type { FurnitureGroup, FurnitureItem, FurniturePatch } from '../../types/furniture';
 import type { Opening, OpeningPatch } from '../../types/opening';
 import type { FloorPoint } from '../../types/room';
+import type { FurnitureTransform } from '../../utils/furnitureRotation';
 import type { ViewMode } from '../../types/view';
 import { openingColliders } from '../../collision/colliders';
 import { rectanglePolygon } from '../../collision/geometry';
@@ -19,6 +20,7 @@ import { DevSceneBridge } from './DevSceneBridge';
 import { OpeningMeasures } from './annotations/OpeningMeasures';
 import { FurnitureClearances } from './furniture/clearance/FurnitureClearances';
 import { FurnitureLayer } from './furniture/FurnitureLayer';
+import { FormationRotationHandle } from './furniture/FormationRotationHandle';
 import { SelectionBounds } from './furniture/SelectionBounds';
 import { FurnitureInteractionProvider } from './interaction/FurnitureInteractionProvider';
 import { OpeningDragProvider } from './interaction/OpeningDragProvider';
@@ -69,6 +71,8 @@ interface PlannerCanvasProps {
   onUpdateFixture: (id: string, patch: FixturePatch) => void;
   onUpdateFurniture: (id: string, patch: FurniturePatch) => void;
   onSetFurniturePositions: (positions: Record<string, FloorPoint>) => void;
+  /** Gemeinsames Drehen (Mehrfachauswahl, Gruppe). */
+  onSetFurnitureTransforms: (transforms: Record<string, FurnitureTransform>) => void;
   /** Anfang/Ende einer Zieh-/Drehbewegung im Grundriss (Verlauf: ein Schritt je Geste). */
   onGestureStart?: () => void;
   onGestureEnd?: () => void;
@@ -114,6 +118,7 @@ export function PlannerCanvas({
   onUpdateFixture,
   onUpdateFurniture,
   onSetFurniturePositions,
+  onSetFurnitureTransforms,
   onGestureStart,
   onGestureEnd,
   viewMode,
@@ -214,11 +219,13 @@ export function PlannerCanvas({
         />
       )}
       <FurnitureInteractionProvider
-        enabled={isPlan}
+        // Grundriss und „3D Bearbeiten“ (dieselbe Logik); die Vorschau bleibt reine Ansicht.
+        enabled={isPlan || !previewing}
         room={room}
         furniture={furniture}
         onUpdate={onUpdateFurniture}
         onSetPositions={onSetFurniturePositions}
+        onSetTransforms={onSetFurnitureTransforms}
         onGestureStart={onGestureStart}
         onGestureEnd={onGestureEnd}
       >
@@ -232,6 +239,7 @@ export function PlannerCanvas({
           severityById={previewing ? NO_SEVERITY : collisions.severityById}
           onPick={onPickFurniture}
         />
+        {selectedItems.length > 1 && <FormationRotationHandle items={selectedItems} room={room} variant={isPlan ? 'plan' : 'model'} />}
         {isPlan && (
           <SelectionMarquee
             room={room}

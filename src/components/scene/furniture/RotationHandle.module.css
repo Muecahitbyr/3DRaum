@@ -52,3 +52,19 @@
   white-space: nowrap;
   transform: translate(-50%, -100%);
 }
+
+/* Touch: sichtbar größer und mit großzügigem Greifbereich (≥ 44 px). */
+@media (pointer: coarse) {
+  .knob {
+    width: 26px;
+    height: 26px;
+    margin: -13px 0 0 -13px;
+  }
+
+  .knob::after {
+    content: '';
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+  }
+}

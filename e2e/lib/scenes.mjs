@@ -195,3 +195,66 @@ export function office() {
     },
   });
 }
+
+/**
+ * V1.1 Block B – realistische Anordnungen (Format 6):
+ * Essbereich mit sechs teilweise unter den Tisch geschobenen Stühlen (keine Kollision),
+ * Büro mit Bürostuhl unter dem Schreibtisch und Tischlampe auf der Platte,
+ * Wohnzimmer mit Sofa, Couchtisch, Sessel und einer echten Kollision (Sessel im Couchtisch).
+ */
+export function diningArea() {
+  n = 0;
+  const chair = (name, x, z, rot) => item('chair', name, x, z, rot, [0.45, 0.52, 0.9], { colors: { fabric: '#c9b79c', wood: '#8a6a4b' } });
+  // Tisch 1,80 × 0,90 bei (3; 2,5): z 2,05–2,95. Stühle 15 cm unter der Platte (z-Mitte 1,94 bzw. 3,06).
+  return { ...project('essbereich', 'Essbereich', {
+    walls: rectangleWalls(6, 5, 2.6),
+    openings: [{ id: 'opening-1', type: 'window', wall: 'north', offset: 2.2, width: 1.6, height: 1.4, sillHeight: 0.85, sashes: 2 }],
+    furniture: [
+      item('table', 'Esstisch', 3, 2.5, 0, [1.8, 0.9, 0.75], { colors: { wood: '#a57c52' } }),
+      chair('Stuhl 1', 2.45, 1.94, 0), chair('Stuhl 2', 3.0, 1.94, 0), chair('Stuhl 3', 3.55, 1.94, 0),
+      chair('Stuhl 4', 2.45, 3.06, 180), chair('Stuhl 5', 3.0, 3.06, 180), chair('Stuhl 6', 3.55, 3.06, 180),
+      item('pendant-light', 'Pendelleuchte', 3, 2.5, 0, [0.5, 0.5, 0.9], { light: { on: true, intensity: 1.1, temperature: 2700 } }),
+      item('sideboard', 'Sideboard', 3, 4.7, 180, [1.6, 0.45, 0.8]),
+    ],
+    design: { floor: 'oak', lighting: { preset: 'warm', brightness: 1 } },
+  }), version: 6 };
+}
+
+export function officeDesk() {
+  n = 0;
+  return { ...project('arbeitsplatz', 'Arbeitsplatz', {
+    walls: rectangleWalls(4, 3.5, 2.6),
+    openings: [
+      // Fenster rechts neben dem Schreibtisch, Tür rechts in der Südwand (Ablage links frei).
+      { id: 'opening-1', type: 'window', wall: 'north', offset: 2.85, width: 1.0, height: 1.4, sillHeight: 0.9, sashes: 1 },
+      { id: 'opening-2', type: 'door', wall: 'south', offset: 0.3, width: 0.9, height: 2.1, hinge: 'right', swing: 'inward' },
+    ],
+    furniture: [
+      // Schreibtisch an der Nordwand (Vorderseite +z), Bürostuhl 20 cm darunter, Tischlampe auf der Platte.
+      item('desk', 'Schreibtisch', 2, 0.35, 0, [1.4, 0.7, 0.75], { colors: { wood: '#b08a62' } }),
+      item('office-chair', 'Bürostuhl', 1.85, 0.835, 180, [0.65, 0.65, 1.1]),
+      item('table-lamp', 'Schreibtischlampe', 1.45, 0.3, 0, [0.28, 0.28, 0.45], { elevation: 0, light: { on: true, intensity: 1, temperature: 3000 } }),
+      item('shelf', 'Regal', 3.8, 1.8, 90, [0.8, 0.35, 1.8]),
+      item('nightstand', 'Ablage', 0.3, 2.6, 90, [0.45, 0.4, 0.55]),
+      item('table-lamp', 'Leselampe', 0.3, 2.6, 0, [0.25, 0.25, 0.4], { elevation: 0.75, light: { on: true, intensity: 0.8, temperature: 2700 } }),
+    ],
+    design: { floor: 'wood-light', lighting: { preset: 'neutral', brightness: 1 } },
+  }), version: 6 };
+}
+
+export function livingCollision() {
+  n = 0;
+  return { ...project('wohnen-kollision', 'Wohnzimmer Kollision', {
+    walls: rectangleWalls(5.5, 4.5, 2.6),
+    openings: [{ id: 'opening-1', type: 'door', wall: 'south', offset: 0.4, width: 0.9, height: 2.1, hinge: 'right', swing: 'inward' }],
+    furniture: [
+      item('sofa', 'Sofa', 2.75, 3.9, 180, [2.2, 0.95, 0.85], { colors: { fabric: '#6b7f99' } }),
+      item('coffee-table', 'Couchtisch', 2.75, 2.7, 0, [1.1, 0.6, 0.45]),
+      // Sessel ragt 20 cm in den Couchtisch: echte Kollision, muss sichtbar bleiben.
+      item('armchair', 'Sessel', 1.95, 2.7, 90, [0.85, 0.85, 0.85], { colors: { fabric: '#b88657' } }),
+      item('tv-board', 'TV-Board', 2.75, 0.25, 0, [1.8, 0.4, 0.5]),
+      item('table-lamp', 'Tischlampe', 3.4, 0.25, 0, [0.28, 0.28, 0.45], { light: { on: true, intensity: 1, temperature: 2700 } }),
+    ],
+    design: { floor: 'herringbone', lighting: { preset: 'daylight', brightness: 1 } },
+  }), version: 6 };
+}

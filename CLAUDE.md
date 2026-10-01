@@ -4,11 +4,13 @@ Browserbasierter Raumplaner: Grundriss (Rechteck, L-Form, freie Polygone) in 2D 
 Durchgänge/Raumobjekte an Wände setzen, Möbel und Lampen platzieren, Materialien und Licht gestalten, in 3D
 bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdatei exportieren.
 
-- **Stand:** V1.0.0 + V1.1 Block A („Maße und Grundriss“). Alle Funktionen fertig und getestet:
-  **1608/1608 Tests in 32 Suiten** grün.
+- **Stand:** V1.0.0 + V1.1 Block A („Maße und Grundriss“) + Block B („Möbel realistisch platzieren“).
+  Alle Funktionen fertig und getestet: **1793/1793 Tests in 35 Suiten** grün.
 - **Repository:** https://github.com/Muecahitbyr/3DRaum.git, Branch `main`.
 - Den aktuellen Stand liefert `git log` (V1.1 Block A: Raumfläche/Umfang, Öffnungsmaßketten,
-  Lagemaße mit Direkteingabe, Durchgang, L-Form-Hauptmaße, Format 6, Unit-Tests).
+  Lagemaße mit Direkteingabe, Durchgang, L-Form-Hauptmaße, Format 6, Unit-Tests; Block B: semantische
+  Kollisionszonen, 3D-Ziehen/-Drehen, gemeinsames Drehen von Auswahl und Gruppe, Gruppennamen,
+  Platzsuche neuer Möbel, Tischlampe auf Trägern).
 - **Sprache:** Oberfläche, Code-Kommentare, Commits und Berichte an den Nutzer auf **Deutsch**.
   Berichte strukturiert und knapp.
 - **Ziel jetzt:** Stabilität und Qualität. Keine Features auf Verdacht und keine Umbauten ohne Anlass.
@@ -46,19 +48,21 @@ src/
   App.tsx                 Komposition: Layout, Sidebar-Panels, Canvas, Dialoge, Export-Ablauf
   main.tsx                Einstieg, globale ErrorBoundary (Fallback „app-error“)
   types/                  Datenmodell: room, opening, fixture, furniture, design, view
-  config/                 Kataloge und Konstanten: furniture (19 Typen), fixtures, openings,
-                          design (Böden, Oberflächen, Licht), room (Grenzen, Vorlagen), scene, collision
+  config/                 Kataloge und Konstanten: furniture (19 Typen), furnitureGeometry (Bauteilmaße für
+                          Modelle und Kollisionszonen), fixtures, openings, design, room, scene, collision
   state/plannerState.ts   Planungs-Reducer (alle Aktionen, Auswahl, Normalisierung)
   state/history.ts        Undo/Redo-Wrapper mit Transaktionen
   hooks/                  usePlanner, useProjectSession, useCollisionReport,
                           useEditingShortcuts, useHistoryShortcuts, useMediaQuery
-  collision/              Collider, Regeln, Erkennung, Meldungstexte
+  collision/              Collider, semantische Möbelzonen (furnitureZones), Regeln, Erkennung (Broad Phase), Meldungstexte
   projects/format.ts      Projektformat v5: Parsen, Validieren, Migrationen 1→5
   projects/storage.ts     localStorage (ein Schlüssel je Projekt)
   export/                 planImage (2D-PNG), pdf (Writer), report (Planungsbericht), files (Download/Import)
   utils/room/             model (RoomModel), plan (Bearbeitung/Validierung, L-Form), containment, dimensions, remap, snap,
                           measurements (Fläche/Umfang, Lagemaße, Maßkette), dimensionLayout (Beschriftung aller Wandmaße)
-  utils/                  polygon, camera, previewCamera, furniture*, openings, fixtures, wallGeometry, units, webgl …
+  utils/                  polygon, camera, previewCamera, furniture*, furniturePlacement (Platzsuche),
+                          furnitureRotation (gemeinsames Drehen), furnitureSupport (Tischlampe auf Trägern),
+                          openings, fixtures, wallGeometry, units, webgl …
   components/
     layout/               PlannerLayout (Drawer), Workspace (Toolbars), MenuButton, Fallback, HistoryControls
     sidebar/              Panels: Raum, Öffnungen, Raumobjekte, Möbel, Eigenschaften, Mehrfachauswahl, Gestaltung
@@ -69,7 +73,8 @@ src/
     scene/                PlannerCanvas, TopView (2D), PerspectiveView (3D), Licht, Lampen, Capture,
                           annotations/ (Wandmaß, Öffnungsmaßkette, Lagemaße der Auswahl),
                           room/ (Wände, Boden, Decke, Öffnungen inkl. Durchgang, Raumobjekte, Wand-Fade),
-                          furniture/ (Modelle, Planssymbole, Abstandsmaße, Drehgriff),
+                          furniture/ (Modelle, Planssymbole, Abstandsmaße, Drehgriff 2D, Drehring 3D,
+                          Grundfläche, gemeinsamer Drehgriff),
                           interaction/ (Drag-Provider, Grundriss-Editor, Auswahlrahmen)
 e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
       unit/*.test.ts (reine Logik; harness.ts, ts-resolve*.mjs)
@@ -135,7 +140,16 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
     Gesamtmaße zuerst (weichen entlang ihrer Linie aus), Kettenmaße danach (zweite Spur oder entfallen).
     Etiketten werden als gedrehte Rechtecke geprüft (Trennachsen-Test), Text folgt der Wandrichtung.
 - **3D Bearbeiten** (`PerspectiveView`): FOV 45. Die Kamera wird einmal pro `fitToken` eingepasst
-  (Start oder Projekt öffnen) und bleibt sonst stehen.
+  (Start oder Projekt öffnen) und bleibt sonst stehen. Seit Block B eine echte Bearbeitungsansicht:
+  - Klick/Antippen wählt aus; ein **ausgewähltes** Möbel lässt sich auf der Bodenebene ziehen (gleiche Logik
+    wie 2D: `FurnitureInteractionProvider`, `computeFurnitureMove`, Raumkontur, Einrasten, Live-Kollisionen).
+    Ziehen über ein nicht ausgewähltes Möbel oder freie Fläche bleibt Kamera.
+  - Die OrbitControls sind `makeDefault` und werden von der Zeiger-Sitzung synchron pausiert
+    (`usePlanPointerSession`: Meter/Pixel auch perspektivisch, Touch-Startschwelle 8 px, zweiter Finger
+    bricht ab und überlässt die Geste der Kamera, Esc stellt den Ausgangszustand her).
+  - Hilfselemente nur in „Bearbeiten“: Grundfläche (`furniture-footprint`), Drehring (`furniture-rotation-ring`,
+    Radius wächst per `useFrame(-1)` bei kleinem Maßstab, Griff nie über dem Möbel) und DOM-Griff.
+    Nicht in Vorschau und Export (`SceneCapture`-Hilfsnamen). Sichtbare Wände blockieren das Greifen dahinter.
   - **Wand-Fade** (`useWallFade`): Wände zwischen Kamera und Raum werden pro Frame ohne React-Render
     ausgeblendet und zeitlich geglättet. Nur der Wechsel der Klickbarkeit löst ein Rendern aus.
   - Ausgeblendete Wände fangen keine Klicks ab.
@@ -161,11 +175,22 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
     Namen werden beim Tippen nicht am Ende gekürzt, erst beim Einlesen.
 - **Lampen:** `light { on, intensity 0,1–2, temperature 2200–6500 K }`, Tischlampe mit `elevation`,
   Decken-/Pendelleuchten mit `mount: 'ceiling'`.
+  - **Tischlampe auf Trägern** (`furnitureSupport`): Liegt ihr Mittelpunkt über einem Möbel mit `surface`
+    (Nachttisch, Schreibtisch, Kommode, Sideboard, Esstisch, Couchtisch, TV-Board), steht sie auf dessen
+    Oberkante (`furnitureBaseY(…, supportY)`; Darstellung, Licht, Kollision, Abstände). Gespeichert bleibt
+    die eigene `elevation` – ohne Träger gilt sie wieder. Keine Formatänderung.
   - Echtes Licht über einen festen Pool von **max. 8 PointLights ohne Schatten** (`LampLights`,
     Größen 0/2/4/8 → keine Shader-Neukompilierung beim Schalten).
   - Lichtfarbe: Kelvin-Wert zu 50 % mit Weiß gemischt (`lampLightColor`).
 - **Bearbeiten:**
-  - Mehrfachauswahl per Shift-Klick bzw. Shift-Ziehen (Rahmen), Gruppen.
+  - Mehrfachauswahl per Shift-Klick bzw. Shift-Ziehen (Rahmen), Gruppen mit optionalem Namen
+    (`renameGroup`, Feld „Gruppenname“, max. 40 Zeichen; leer → „Gruppe N“; bereits Teil von Format 6).
+  - **Gemeinsames Drehen** (Auswahl, Gruppe): Griff über dem Auswahlrahmen (2D) bzw. Ring (3D) und
+    Schaltflächen ±90°. `rotateFormation` dreht um die Auswahlmitte (Positionen und Eigendrehung),
+    hält alles in der Raumkontur (Formation verschieben) oder lehnt den Winkel ab. Eine Geste = ein Schritt.
+  - **Neue Möbel** (`findFreePosition`): deterministische Platzsuche auf 25-cm-Raster um die Raummitte
+    (max. 600 Plätze), erster Platz ohne Kollision (Möbel, Wände, Türschwenk, Fenster, Heizkörper);
+    sonst Raummitte mit Warnung.
   - Duplizieren Strg/⌘+D, Kopieren/Einfügen (Versatz 0,2 m), Entf/Backspace löscht.
   - Pfeiltasten verschieben, Ausrichten an Wänden bzw. Raummitte (`AlignmentTools`).
   - Drehgriff im Grundriss, Einrasten an Wänden und Möbeln (`computeFurnitureMove`).
@@ -187,6 +212,19 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
 
 - `computeCollisionReport` (über `useCollisionReport`) prüft Collider mit Höhenbereichen:
   Möbel, Wände, Öffnungen inklusive Türschwenk (Viertelkreis-Polygon) und Fensterzone (0,4 m), Raumobjekte.
+- **Semantisches Möbelmodell** (`collision/furnitureZones.ts`, Katalog `collision`): Möbel bestehen aus festen
+  Zonen; kollidiert wird nur, wenn sich Zonen im Grundriss **und** in der Höhe überschneiden.
+  | Form | Zonen | Folge |
+  |---|---|---|
+  | `box` (Standard, auch Couchtisch) | Korpus | fester Körper |
+  | `table` | Platte, 4 Beine | darunter frei bis zur Plattenunterkante |
+  | `desk` | Platte, Wange, Container, Sichtblende | Beinraum zwischen Wange und Container |
+  | `chair` | Unterteil bis Sitzhöhe, Lehne | Sitz passt unter die Platte, die Lehne nicht |
+  | `office-chair` | Unterteil bis Armlehnen-Oberkante, Lehne | passt, wenn die Armlehnen passen |
+  Maße aus `config/furnitureGeometry.ts` (dieselben Formeln wie die 3D-Modelle). Zusätzlich eine Hülle
+  (`furnitureEnvelope`) nur für die Heizkörper-Regel. Broad Phase (Sortieren/Fegen), ein Treffer je
+  Möbelpaar (auch bei symmetrischen Regeln), Collider je Möbel zwischengespeichert (WeakMap).
+  Abstandsmaße unterscheiden geometrischen Abstand, erlaubte Überdeckung (übergangen) und echte Kollision.
 - **Regeln** (`collision/rules.ts`):
 
   | Regel | Schwere |
@@ -194,7 +232,7 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   | `furniture-overlap` | error |
   | `door-swing` | error |
   | `window-blocked` | warning |
-  | `radiator-covered` | error |
+  | `radiator-covered` (ganze Hülle) | error |
   | `radiator-door-swing` | error |
   | `furniture-wall` | error |
   | `opening-overlap` | error |
@@ -360,7 +398,10 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - `<Edges key={edgeCount}>` an Wänden baut die Kantenlinie neu auf, wenn sich die Kantenzahl ändert.
     Sonst übernimmt three.js die alte Instanzanzahl, und es entstehen Streulinien.
 - **Messbar:** Die Suite „performance“ prüft React-Commits im Leerlauf (0) und beim Ziehen (nur bei
-  Bewegung) sowie Speicherlecks: `gl.info.memory` ist nach Zyklen unverändert.
+  Bewegung) sowie Speicherlecks: `gl.info.memory` ist nach Zyklen unverändert. Mit 150 Möbeln: 3D-Ziehen
+  ≈ 3, Drehen ≈ 3, Gruppendrehen ≈ 4 Commits je Bewegung, danach 0 Commits und 0 Frames; Kollisionsbericht
+  bei einem bewegten Möbel < 1 ms.
+- `RoomDimensionLines` ist `memo`: Jedes Maß-Etikett ist ein eigenes HTML-Overlay mit eigener React-Wurzel.
 
 ## Wichtige Entscheidungen und bekannte Grenzen
 
@@ -374,6 +415,10 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - Maßketten nur für Türen/Fenster/Durchgänge (nicht für Raumobjekte). Bei sehr kleinem Zoom entfallen
     einzelne Kettenzahlen statt sich zu überdecken; die Auswahlmaße zeigen sie dann im Raum.
   - L-Form-Hauptmaße nur für den Ausschnitt rechts unten; frei bearbeitete L-Formen über den Editor.
+  - Kollisionszonen nur für Esstisch, Schreibtisch, Stuhl, Bürostuhl; alle anderen sind Quader.
+    Abstandsmaße übergehen ein erlaubt überdeckendes Möbel (z. B. den Tisch über dem Stuhl).
+  - In 3D wird nur ein bereits ausgewähltes Möbel gezogen (erst antippen/klicken, dann ziehen).
+  - Gemeinsames Drehen lehnt Winkel ab, in denen die Formation nicht in den Raum passt.
   - Ohne WebGL keine 3D-Ansicht.
   - Die E2E-Tests laufen mit Software-WebGL (SwiftShader), deshalb sind die Bildraten-Grenzwerte großzügig
     bzw. relativ zu einer Grundlinie im selben Lauf.
@@ -397,19 +442,22 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
 - Die meisten Suiten laufen gegen den **Dev-Server** (wegen `__PLANNER_R3F__`). Daher **während eines
   laufenden Testlaufs keine Dateien in `src/` ändern**: HMR verfälscht die Ergebnisse.
 - **Hilfen:**
-  - `e2e/lib/scenes.mjs`: Testprojekte (livingRoom, bedroom, lRoom, freeRoom, office), `project()`,
+  - `e2e/lib/scenes.mjs`: Testprojekte (livingRoom, bedroom, lRoom, freeRoom, office; Block B: diningArea,
+    officeDesk, livingCollision), `project()`,
     `item()`, `openScene()`.
   - `e2e/lib/planner.mjs`: `addFurniture`.
   - `e2e/lib/images.mjs`: `analyzeImage`, `exportFile`.
-- **Suiten (32):**
-  - Unit: Kollisionsgeometrie, Raummaße & Maßketten, L-Form, Öffnungen/Durchgang/Format 6
+- **Suiten (35):**
+  - Unit: Kollisionsgeometrie, Raummaße & Maßketten, L-Form, Öffnungen/Durchgang/Format 6,
+    Kollisionszonen & Höhen, Platzierung/Drehen/Gruppen/Tischlampen
   - Grundlagen: Raumgeometrie, Raum 2D/3D (Preview-Build)
   - Öffnungen: Türen & Fenster, Drag & Drop Türen/Fenster, **Maße, Durchgang & L-Form**
-  - Möbel: Möbel, Drag & Drop Möbel, Möbelbibliothek, Abstandsmaße, Bearbeiten/Mehrfachauswahl/Gruppen
+  - Möbel: Möbel, Drag & Drop Möbel, Möbelbibliothek, Abstandsmaße, Bearbeiten/Mehrfachauswahl/Gruppen,
+    **Möbel realistisch platzieren** (Essbereich/Büro/Wohnzimmer, 3D ziehen/drehen, Touch 375–768 px)
   - Szene: Kollisionen, Kameraabhängige Wände, Raumobjekte, Freie Raumformen & Grundriss-Editor
   - Gestaltung: Gestaltung, Gestaltung/Decke/Licht/Vorschau, Lampen & Möbelfarben, Visuelle Szenen
   - Verlauf und Projekte: Undo/Redo, Lokale Projekte, Speicherkompatibilität (Format 1–6)
   - Performance: Performance, **Rendern auf Anforderung**
   - V1-Abnahme: Export, Mobile/Tablet/Touch, Fehlerbehandlung & Robustheit, Accessibility,
     Visuelle Endabnahme (5 Projekte × 3 Geräte)
-- **Aktueller Stand:** **1608/1608 Tests in 32 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.
+- **Aktueller Stand:** **1793/1793 Tests in 35 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.

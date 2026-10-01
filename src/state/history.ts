@@ -182,6 +182,11 @@ export function describeAction(action: PlannerAction, state: PlannerState): stri
       return 'Möbel verschieben';
     case 'alignFurniture':
       return 'Möbel ausrichten';
+    case 'setFurnitureTransforms':
+    case 'rotateFurnitureMany':
+      return 'Möbel drehen';
+    case 'renameGroup':
+      return 'Gruppe umbenennen';
     case 'groupFurniture':
       return 'Möbel gruppieren';
     case 'ungroupFurniture':

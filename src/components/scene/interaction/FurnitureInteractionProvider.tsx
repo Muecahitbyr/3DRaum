@@ -19,18 +19,22 @@ import type { RoomModel } from '../../../utils/room/model';
 import { furnitureToWorld } from '../../../utils/furniture';
 import { moveFormation } from '../../../utils/furnitureFormation';
 import { computeFurnitureMove, planAngleDeg, snapRotation, type FurnitureSnapGuide } from '../../../utils/furnitureDrag';
+import { formationCenter, rotateFormation, type FurnitureTransform } from '../../../utils/furnitureRotation';
 import { usePlanPointerSession, type PointerStart } from './usePlanPointerSession';
 
 export interface FurnitureInteractionApi {
   /**
-   * Verschieben starten (linke Maustaste auf dem Möbel im Grundriss). `ids`: alle
-   * gemeinsam zu verschiebenden Möbel (Mehrfachauswahl/Gruppe); das gegriffene rastet ein.
+   * Verschieben starten (linke Maustaste bzw. Finger auf dem Möbel – im Grundriss und in
+   * „3D Bearbeiten“). `ids`: alle gemeinsam zu verschiebenden Möbel (Mehrfachauswahl/Gruppe);
+   * das gegriffene rastet ein.
    */
   startMove: (item: FurnitureItem, event: ThreeEvent<PointerEvent>, ids?: readonly string[]) => void;
   /** Drehen starten (Rotations-Handle). */
   startRotate: (item: FurnitureItem, pointer: PointerStart) => void;
-  /** Laufende Bearbeitung, z. B. für die Winkelanzeige am Handle. */
-  active: { kind: 'move' | 'rotate'; id: string } | null;
+  /** Mehrere Möbel (Auswahl, Gruppe) gemeinsam um ihre Mitte drehen. */
+  startRotateMany: (ids: readonly string[], pointer: PointerStart) => void;
+  /** Laufende Bearbeitung, z. B. für die Winkelanzeige am Handle (`delta`: Drehwinkel der Auswahl). */
+  active: { kind: 'move' | 'rotate'; id: string } | { kind: 'rotate-many'; ids: readonly string[]; delta: number } | null;
 }
 
 const FurnitureInteractionContext = createContext<FurnitureInteractionApi | null>(null);
@@ -55,6 +59,8 @@ interface FurnitureInteractionProviderProps {
   onUpdate: (id: string, patch: FurniturePatch) => void;
   /** Mehrere Möbel gleichzeitig versetzen (gemeinsames Verschieben). */
   onSetPositions?: (positions: Record<string, FloorPoint>) => void;
+  /** Mehrere Möbel gleichzeitig drehen (Position + Drehung). */
+  onSetTransforms?: (transforms: Record<string, FurnitureTransform>) => void;
   /** Anfang/Ende einer Zieh- oder Drehbewegung – für den Verlauf (eine Geste = ein Schritt). */
   onGestureStart?: () => void;
   onGestureEnd?: () => void;
@@ -62,9 +68,10 @@ interface FurnitureInteractionProviderProps {
 }
 
 /**
- * Verschieben und Drehen von Möbeln im Grundriss. Alle Änderungen laufen über
- * `onUpdate` in den Reducer – dort werden Maße, Rotation und Raumgrenzen normalisiert,
- * daher zeigt die Sidebar die Werte live an.
+ * Verschieben und Drehen von Möbeln im Grundriss und in „3D Bearbeiten“ – dieselbe Logik
+ * für beide Ansichten (Bodenebene, Einrasten, Raumkontur). Alle Änderungen laufen über den
+ * Reducer – dort werden Maße, Rotation und Raumgrenzen normalisiert, daher zeigt die
+ * Sidebar die Werte live an. Eine Geste = ein Verlaufsschritt; Esc stellt den Ausgangszustand her.
  */
 export function FurnitureInteractionProvider({
   enabled,
@@ -72,13 +79,14 @@ export function FurnitureInteractionProvider({
   furniture,
   onUpdate,
   onSetPositions,
+  onSetTransforms,
   onGestureStart,
   onGestureEnd,
   children,
 }: FurnitureInteractionProviderProps) {
-  const latest = useRef({ room, furniture, onUpdate, onSetPositions, onGestureStart, onGestureEnd });
+  const latest = useRef({ room, furniture, onUpdate, onSetPositions, onSetTransforms, onGestureStart, onGestureEnd });
   useLayoutEffect(() => {
-    latest.current = { room, furniture, onUpdate, onSetPositions, onGestureStart, onGestureEnd };
+    latest.current = { room, furniture, onUpdate, onSetPositions, onSetTransforms, onGestureStart, onGestureEnd };
   });
 
   const { begin, end, pointerToFloor } = usePlanPointerSession();
@@ -88,8 +96,10 @@ export function FurnitureInteractionProvider({
   const startMove = useCallback(
     (item: FurnitureItem, event: ThreeEvent<PointerEvent>, ids: readonly string[] = [item.id]) => {
       const { room: dims, furniture: startFurniture, onSetPositions: setPositions } = latest.current;
-      // Greifpunkt relativ zum Mittelpunkt, damit das Möbel nicht zum Zeiger springt.
-      const grab = { x: event.point.x + dims.origin.x - item.position.x, z: event.point.z + dims.origin.z - item.position.z };
+      // Greifpunkt relativ zum Mittelpunkt, damit das Möbel nicht zum Zeiger springt – gemessen
+      // auf der Bodenebene (in 3D trifft der Zeiger sonst z. B. die Tischplatte, nicht den Boden).
+      const down = pointerToFloor(event.nativeEvent.clientX, event.nativeEvent.clientY) ?? { x: event.point.x, z: event.point.z };
+      const grab = { x: down.x + dims.origin.x - item.position.x, z: down.z + dims.origin.z - item.position.z };
       const original = item.position;
       // Formation: Ausgangslagen aller mitbewegten Möbel (Verschiebung immer relativ dazu).
       const formation = setPositions ? startFurniture.filter((f) => ids.includes(f.id)) : [];
@@ -101,6 +111,7 @@ export function FurnitureInteractionProvider({
           pointerId: event.pointerId,
           clientX: event.nativeEvent.clientX,
           clientY: event.nativeEvent.clientY,
+          pointerType: event.nativeEvent.pointerType,
           startTolerancePx: FURNITURE_DRAG_CONFIG.dragStartTolerancePx,
           onMove: (floor, metersPerPixel) => {
             const { room: d, furniture: all, onUpdate: update } = latest.current;
@@ -137,7 +148,7 @@ export function FurnitureInteractionProvider({
       // Erst nach dem Start melden: `begin` beendet ggf. eine alte Sitzung (deren Ende-Meldung).
       latest.current.onGestureStart?.();
     },
-    [begin, end],
+    [begin, end, pointerToFloor],
   );
 
   const startRotate = useCallback(
@@ -175,14 +186,52 @@ export function FurnitureInteractionProvider({
     [begin, pointerToFloor],
   );
 
-  // Wechsel in die 3D-Ansicht beendet eine laufende Bearbeitung.
+  const startRotateMany = useCallback(
+    (ids: readonly string[], pointer: PointerStart) => {
+      const { room: dims, furniture: all } = latest.current;
+      const items = all.filter((f) => ids.includes(f.id));
+      if (items.length === 0) return;
+      // Drehpunkt: Mitte der Auswahl (Grundriss) – wie der Auswahlrahmen.
+      const pivot = formationCenter(items);
+      const pivotWorld = furnitureToWorld(pivot, dims);
+      const startPoint = pointerToFloor(pointer.clientX, pointer.clientY);
+      const startAngle = startPoint ? planAngleDeg(pivotWorld, startPoint) : 0;
+      const originals: Record<string, FurnitureTransform> = Object.fromEntries(items.map((f) => [f.id, { position: f.position, rotationDeg: f.rotationDeg }]));
+      setActive({ kind: 'rotate-many', ids, delta: 0 });
+      begin(
+        {
+          ...pointer,
+          startTolerancePx: 1,
+          onMove: (floor) => {
+            // Gleiches Raster wie beim einzelnen Möbel: 5°, kräftiger bei 0/90/180/270°.
+            const delta = snapRotation(planAngleDeg(pivotWorld, floor) - startAngle);
+            // Immer vom Ausgangszustand aus: Zurückdrehen stellt die Lage exakt wieder her.
+            const transforms = rotateFormation(items, pivot, delta, latest.current.room);
+            if (!transforms) return; // in diesem Winkel passt die Formation nicht in den Raum
+            latest.current.onSetTransforms?.(transforms);
+            setActive({ kind: 'rotate-many', ids, delta });
+          },
+          onCancel: () => latest.current.onSetTransforms?.(originals),
+          onEnd: () => {
+            setActive(null);
+            latest.current.onGestureEnd?.();
+          },
+        },
+        'grabbing',
+      );
+      latest.current.onGestureStart?.();
+    },
+    [begin, pointerToFloor],
+  );
+
+  // Wechsel in die Vorschau (bzw. Unmount) beendet eine laufende Bearbeitung.
   useEffect(() => {
     if (!enabled) end();
   }, [enabled, end]);
 
   const api = useMemo<FurnitureInteractionApi | null>(
-    () => (enabled ? { startMove, startRotate, active } : null),
-    [enabled, startMove, startRotate, active],
+    () => (enabled ? { startMove, startRotate, startRotateMany, active } : null),
+    [enabled, startMove, startRotate, startRotateMany, active],
   );
 
   // Hilfslinien über die ganze Umriss-Hülle (Welt).

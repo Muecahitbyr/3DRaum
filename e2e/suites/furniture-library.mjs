@@ -134,10 +134,14 @@ for (const [index, type] of TYPES.entries()) {
   await addFurniture(page, type);
   ids[type] = await lastId();
   const name = await val('Name');
-  check(`${label}: hinzugefügt, ausgewählt, mittig, Standardmaße`,
+  // V1.1: Neue Möbel stehen auf dem nächsten freien Platz um die Raummitte (vorher immer exakt mittig,
+  // auch auf bereits belegter Fläche) – geprüft wird „frei“ statt „mittig“.
+  const marked = await page.locator('[data-testid="furniture-list-item"] [data-severity]').count();
+  check(`${label}: hinzugefügt, ausgewählt, auf freiem Platz, Standardmaße`,
     name === `${label} 1` && (await fp.getByTestId('furniture-type').textContent()).includes(label) &&
     (await val('Breite')) === de(w) && (await val('Tiefe')) === de(d) && (await val('Höhe')) === de(h) &&
-    (await val('X-Position')) === '6,00' && (await val('Z-Position')) === '5,00', `${name} ${await val('Breite')}×${await val('Tiefe')}×${await val('Höhe')}`);
+    marked === 0 && (index > 0 || ((await val('X-Position')) === '6,00' && (await val('Z-Position')) === '5,00')),
+    `${name} ${await val('Breite')}×${await val('Tiefe')}×${await val('Höhe')} @ ${await val('X-Position')}/${await val('Z-Position')}, ${marked} markiert`);
   const i = await info(ids[type]);
   check(`${label}: 3D-Modell exakt in den Außenmaßen, aus ${i.meshes} Bauteilen`, sizeOk(i, [w, d, h]) && i.meshes >= 3, i.size.map((v) => v.toFixed(3)).join(' × '));
   // Rasteraufstellung 5 × 3

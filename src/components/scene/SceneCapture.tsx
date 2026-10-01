@@ -8,7 +8,7 @@ export interface SceneCaptureApi {
 }
 
 /** Hilfselemente, die nie in einen Export gehören (Auswahl, Einrasthilfen …). */
-const HELPER_NAMES = ['furniture-outline', 'selection-bounds', 'snap-guide', 'selection-marquee', 'passage-outline'];
+const HELPER_NAMES = ['furniture-outline', 'selection-bounds', 'snap-guide', 'selection-marquee', 'passage-outline', 'furniture-rotation-ring', 'furniture-footprint'];
 const isHelper = (o: Object3D) =>
   HELPER_NAMES.includes(o.name) || o.name.startsWith('furniture-snap-guide') || o.name.startsWith('room-snap-guide');
 

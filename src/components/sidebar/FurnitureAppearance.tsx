@@ -2,12 +2,15 @@ import { useId } from 'react';
 import { FURNITURE_CATALOG, isCeilingMounted, LAMP_INTENSITY, LAMP_TEMPERATURE } from '../../config/furniture';
 import type { FurnitureColorSlot, FurnitureItem, FurniturePatch } from '../../types/furniture';
 import { furnitureColor, kelvinToHex } from '../../utils/furniture';
+import { formatMeters } from '../../utils/units';
 import { MeasurementInput } from '../ui/MeasurementInput';
 import styles from './FurnitureAppearance.module.css';
 
 interface FurnitureAppearanceProps {
   item: FurnitureItem;
   roomHeight: number;
+  /** Tischlampe auf einem Träger: dessen Name und Oberkante. */
+  support?: { name: string; height: number } | null;
   onChange: (patch: FurniturePatch) => void;
 }
 
@@ -15,7 +18,7 @@ interface FurnitureAppearanceProps {
  * Farben (je sinnvollem Bereich, nicht jedes Bauteil) und – bei Lampen – Licht:
  * Ein/Aus, Helligkeit und Farbtemperatur. Tischlampen zusätzlich mit Standhöhe.
  */
-export function FurnitureAppearance({ item, roomHeight, onChange }: FurnitureAppearanceProps) {
+export function FurnitureAppearance({ item, roomHeight, support = null, onChange }: FurnitureAppearanceProps) {
   const definition = FURNITURE_CATALOG[item.type];
   const slots = definition.colorSlots ?? [];
   const lamp = definition.lamp;
@@ -104,7 +107,12 @@ export function FurnitureAppearance({ item, roomHeight, onChange }: FurnitureApp
         </div>
       )}
 
-      {definition.elevation && (
+      {definition.elevation && support && (
+        <p className={styles.hint} data-testid="lamp-support">
+          Steht auf „{support.name}“ ({formatMeters(support.height)} m) – Standhöhe automatisch. Ohne Unterlage gilt wieder die eigene Standhöhe.
+        </p>
+      )}
+      {definition.elevation && !support && (
         <MeasurementInput
           label="Standhöhe"
           value={item.elevation ?? definition.elevation.default}

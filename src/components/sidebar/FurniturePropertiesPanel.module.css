@@ -51,3 +51,18 @@
     height: 40px;
   }
 }
+
+/* Mehrfachauswahl: Drehen um die gemeinsame Mitte. */
+.rotateRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.rotateRow > button {
+  padding-inline: 10px;
+  font-size: 12px;
+}

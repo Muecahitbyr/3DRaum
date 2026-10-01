@@ -21,8 +21,12 @@ export function describeCollisions(
 ): CollisionMessage[] {
   const grouped = new Map<string, { rule: CollisionRuleId; asSubject: boolean; names: string[] }>();
   for (const hit of report.byObject.get(refKey(ref)) ?? []) {
-    const asSubject = sameRef(hit.subject, ref);
-    const counterpart = asSubject ? hit.other : hit.subject;
+    // Symmetrische Regeln (Möbel ↔ Möbel, Öffnung ↔ Öffnung): Die Rolle ist bedeutungslos –
+    // alle Gegenüber in EINER Meldung („… mit Sofa 1 und Kleiderschrank 1.“).
+    const symmetric = RULES_BY_ID.get(hit.rule)!.kinds[0] === RULES_BY_ID.get(hit.rule)!.kinds[1];
+    const isSubject = sameRef(hit.subject, ref);
+    const counterpart = isSubject ? hit.other : hit.subject;
+    const asSubject = symmetric || isSubject;
     const key = `${hit.rule}:${asSubject}`;
     const entry = grouped.get(key) ?? { rule: hit.rule, asSubject, names: [] };
     const name = nameOf(counterpart);

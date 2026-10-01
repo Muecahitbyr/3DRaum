@@ -28,6 +28,7 @@ export function RotationHandle({ item }: { item: FurnitureItem }) {
       pointerId: event.pointerId,
       clientX: event.clientX,
       clientY: event.clientY,
+      pointerType: event.pointerType,
     });
   };
 

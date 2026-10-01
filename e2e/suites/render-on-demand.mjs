@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-import { livingRoom, lRoom, openScene } from '../lib/scenes.mjs';
+import { diningArea, livingRoom, lRoom, openScene } from '../lib/scenes.mjs';
 
 /**
  * Rendern auf Anforderung (frameloop="demand"): Im Leerlauf entstehen keine Frames;
@@ -209,6 +209,46 @@ await interaction('Grundriss-Editor: Ecke ziehen', async () => {
 });
 await page.getByTestId('room-edit-toggle').click(); await settle(400);
 await interaction('Nach Wandbearbeitung zurück in 3D', () => view('3D'));
+
+// ---------- 3D Bearbeiten: Möbel ziehen, drehen, Gruppe drehen, Kollision live (Block B)
+await openScene(page, diningArea());
+await view('3D');
+await rest();
+const knobCenter = async (testId) => { const b = await page.getByTestId(testId).boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+await interaction('3D: Möbel auswählen (Grundfläche, Drehring)', async () => { await page.getByTestId('furniture-list-item').filter({ hasText: 'Stuhl 5' }).click(); await settle(); });
+await interaction('3D: Möbel ziehen (Bodenebene)', async () => {
+  const p = await screenOf('furniture-6', 0.45);
+  await drag(p, { x: p.x + 90, y: p.y + 20 });
+  await settle(300);
+});
+await interaction('3D: Möbel drehen (Ring)', async () => {
+  const k = await knobCenter('rotation-handle-3d');
+  const c = await screenOf('furniture-6', 0);
+  await drag(k, { x: c.x + (c.y - k.y), y: c.y - (c.x - k.x) }, 16);
+  await settle(300);
+});
+await interaction('3D: Kollision live (Stuhl in den Tisch ziehen)', async () => {
+  const p = await screenOf('furniture-6', 0.45);
+  const t = await screenOf('furniture-1', 0.45);
+  await drag(p, t, 16);
+  await settle(300);
+});
+const live = await page.evaluate(() => { let n = 0; window.__PLANNER_R3F__().scene.traverse((o) => { if (o.name === 'furniture-footprint' || (o.name === 'furniture-outline' && o.userData.status === 'error')) n++; }); return n; });
+check('3D: Kollisionsrahmen und Grundfläche nach dem Ziehen sichtbar', live >= 2, String(live));
+await interaction('3D: Rückgängig nach dem Ziehen', async () => { await page.evaluate(() => document.activeElement?.blur()); await page.keyboard.press('ControlOrMeta+z'); await settle(400); });
+await interaction('3D: Mehrfachauswahl (Tisch + Stühle)', async () => {
+  await page.keyboard.down('Shift');
+  for (const name of ['Esstisch', 'Stuhl 1', 'Stuhl 2']) await page.getByTestId('furniture-list-item').filter({ hasText: name }).click();
+  await page.keyboard.up('Shift'); await settle(400);
+});
+await interaction('3D: Auswahl gemeinsam drehen (Ring)', async () => {
+  const k = await knobCenter('formation-rotation-handle');
+  const c = await screenOf('furniture-1', 0);
+  await drag(k, { x: c.x + (c.y - k.y), y: c.y - (c.x - k.x) }, 16);
+  await settle(300);
+});
+check('Leerlauf nach 3D-Bearbeitung: keine Frames über 2 s', (await idleFrames(2000)) === 0);
+await page.screenshot({ path: `${OUT}/05-3d-bearbeiten.png` });
 
 // ---------- Fenstergröße (z. B. Gerät drehen)
 await interaction('Fenstergröße ändern', async () => { await page.setViewportSize({ width: 1200, height: 800 }); await settle(800); }, { expectChange: false });

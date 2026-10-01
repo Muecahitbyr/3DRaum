@@ -1,6 +1,6 @@
 import { useThree } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Plane, Raycaster, Vector2, Vector3 } from 'three';
+import { Plane, Raycaster, Vector2, Vector3, type PerspectiveCamera } from 'three';
 import type { FloorPoint } from '../../../types/room';
 
 const FLOOR_PLANE = new Plane(new Vector3(0, 1, 0), 0);
@@ -14,7 +14,12 @@ export interface PointerStart {
   pointerId: number;
   clientX: number;
   clientY: number;
+  /** `touch`: größere Startschwelle, damit ein Antippen nie verschiebt. */
+  pointerType?: string;
 }
+
+/** Mindestbewegung bei Touch (Pixel), ab der aus einem Antippen eine Bearbeitung wird. */
+const TOUCH_START_TOLERANCE_PX = 8;
 
 export interface PlanPointerSessionOptions extends PointerStart {
   /** Bewegung in Pixeln, ab der die Bearbeitung beginnt (Klicks bleiben Klicks). */
@@ -35,11 +40,13 @@ interface ActiveSession {
 }
 
 /**
- * Gemeinsame Mechanik für direkte Bearbeitung im Grundriss: pausiert die
- * Kamerasteuerung synchron (sie erhält dasselbe pointerdown direkt danach),
+ * Gemeinsame Mechanik für direkte Bearbeitung im Grundriss und in „3D Bearbeiten“: pausiert
+ * die Kamerasteuerung synchron (sie erhält dasselbe pointerdown direkt danach),
  * hält den Zeiger fest (auch außerhalb der Zeichenfläche), rechnet Bildschirm-
- * in Bodenkoordinaten um und unterstützt Esc zum Abbrechen. Nach einer echten
- * Bearbeitung wird der folgende Klick verschluckt, damit er nicht die Auswahl aufhebt.
+ * in Bodenkoordinaten um (orthografisch wie perspektivisch) und unterstützt Esc zum
+ * Abbrechen. Ein zweiter Finger bricht ab (die Geste gehört dann der Kamera: Pinch).
+ * Nach einer echten Bearbeitung wird der folgende Klick verschluckt, damit er nicht die
+ * Auswahl aufhebt.
  */
 export function usePlanPointerSession() {
   const get = useThree((state) => state.get);
@@ -64,6 +71,23 @@ export function usePlanPointerSession() {
       return hit ? { x: hit.x, z: hit.z } : null;
     },
     [get, tools],
+  );
+
+  /**
+   * Meter je Bildschirmpixel am Bodenpunkt: Draufsicht über den Zoom, Perspektive über
+   * Entfernung und Sichtfeld – Einrastabstände bleiben so auf dem Bildschirm gleich groß.
+   */
+  const metersPerPixelAt = useCallback(
+    (floor: FloorPoint): number => {
+      const { camera, size } = get();
+      if ('isPerspectiveCamera' in camera && camera.isPerspectiveCamera) {
+        const perspective = camera as PerspectiveCamera;
+        const distance = perspective.position.distanceTo(new Vector3(floor.x, 0, floor.z));
+        return (2 * distance * Math.tan((perspective.fov * Math.PI) / 360)) / Math.max(size.height, 1);
+      }
+      return 1 / Math.max(camera.zoom, 1e-6);
+    },
+    [get],
   );
 
   const end = useCallback(() => {
@@ -92,17 +116,25 @@ export function usePlanPointerSession() {
       const captureTarget = get().gl.domElement;
       captureTarget.setPointerCapture(options.pointerId);
 
+      const tolerance = options.pointerType === 'touch' ? Math.max(options.startTolerancePx, TOUCH_START_TOLERANCE_PX) : options.startTolerancePx;
       const onPointerMove = (e: PointerEvent) => {
         const s = session.current;
         if (!s || e.pointerId !== s.options.pointerId) return;
         if (!s.moved) {
-          if (Math.hypot(e.clientX - s.options.clientX, e.clientY - s.options.clientY) < s.options.startTolerancePx) return;
+          if (Math.hypot(e.clientX - s.options.clientX, e.clientY - s.options.clientY) < tolerance) return;
           s.moved = true;
         }
         const floor = pointerToFloor(e.clientX, e.clientY);
         if (!floor) return;
         document.body.style.cursor = cursor;
-        s.options.onMove(floor, 1 / Math.max(get().camera.zoom, 1e-6));
+        s.options.onMove(floor, metersPerPixelAt(floor));
+      };
+      // Zweiter Finger: Bearbeitung abbrechen (Ausgangszustand) – Pinch/Zoom bleibt der Kamera.
+      const onPointerDown = (e: PointerEvent) => {
+        const s = session.current;
+        if (!s || e.pointerId === s.options.pointerId) return;
+        s.options.onCancel();
+        end();
       };
       const onPointerUp = (e: PointerEvent) => {
         if (session.current && e.pointerId === session.current.options.pointerId) end();
@@ -117,6 +149,7 @@ export function usePlanPointerSession() {
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
       window.addEventListener('pointercancel', onPointerUp);
+      window.addEventListener('pointerdown', onPointerDown, { capture: true });
       window.addEventListener('keydown', onKeyDown);
       session.current = {
         options,
@@ -126,14 +159,15 @@ export function usePlanPointerSession() {
           window.removeEventListener('pointermove', onPointerMove);
           window.removeEventListener('pointerup', onPointerUp);
           window.removeEventListener('pointercancel', onPointerUp);
+          window.removeEventListener('pointerdown', onPointerDown, { capture: true });
           window.removeEventListener('keydown', onKeyDown);
         },
       };
     },
-    [end, get, pointerToFloor, setControlsEnabled],
+    [end, get, metersPerPixelAt, pointerToFloor, setControlsEnabled],
   );
 
   useEffect(() => end, [end]);
 
-  return { begin, end, pointerToFloor };
+  return { begin, end, pointerToFloor, metersPerPixelAt };
 }

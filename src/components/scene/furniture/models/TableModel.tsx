@@ -1,18 +1,14 @@
 import { FURNITURE_COLORS as C } from '../../../../config/furniture';
+import { tableGeometry } from '../../../../config/furnitureGeometry';
 import { Part, colorOf, derivedOf } from './parts';
 import type { FurnitureModelProps } from './types';
-
-const LEG = 0.05;
-const LEG_INSET = 0.07;
 
 /** Tisch: Platte mit vier Beinen. */
 export function TableModel({ width: w, depth: d, height: h, colors }: FurnitureModelProps) {
   const top = colorOf(colors, 'wood', C.tableTop);
   const leg = derivedOf(colors, 'wood', C.tableLeg, -0.35);
-  const topT = Math.min(0.04, h * 0.1);
-  const legH = h - topT;
-  const insetX = Math.min(LEG_INSET, w / 2 - LEG / 2);
-  const insetZ = Math.min(LEG_INSET, d / 2 - LEG / 2);
+  // Maße gemeinsam mit den Kollisionszonen (Stühle passen zwischen die Beine).
+  const { leg: LEG, topT, legH, insetX, insetZ } = tableGeometry(w, d, h);
 
   return (
     <group>

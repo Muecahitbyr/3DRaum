@@ -142,14 +142,16 @@ await addFurniture(page, 'sofa'); await settle(200);
 await setIn(fp, 'Name', 'Couch');
 await setIn(fp, 'Höhe', '0,95');
 await setIn(fp, 'Rotation', '90');
-await setIn(fp, 'X-Position', '3');
+// V1.1: Neue Möbel stehen auf dem nächsten freien Platz – das Ziel muss sich davon unterscheiden.
+const targetX = (await val(fp, 'X-Position')) === '3,00' ? '2,8' : '3';
+await setIn(fp, 'X-Position', targetX);
 const labels = [];
 for (let i = 0; i < 5; i++) { labels.push((await hist()).undo); await undo(); }
 check('Undo-Reihenfolge: Verschieben, Drehen, Maße, Name, Hinzufügen', labels.join(' | ') === ['Möbel verschieben', 'Möbel drehen', 'Möbelmaße ändern', 'Möbelname ändern', 'Möbel hinzufügen'].map((l) => l + ' rückgängig').join(' | '), labels.join(' | '));
 check('Nach 5× Undo: Sofa entfernt, Bett vorhanden', (await items('furniture').count()) === 1);
 for (let i = 0; i < 5; i++) await redo();
 await items('furniture').nth(1).click(); await settle();
-check('5× Redo: Couch, 0,95 m, 90°, X 3,00', (await val(fp, 'Name')) === 'Couch' && (await val(fp, 'Höhe')) === '0,95' && (await val(fp, 'Rotation')) === '90' && (await val(fp, 'X-Position')) === '3,00');
+check(`5× Redo: Couch, 0,95 m, 90°, X ${targetX}`, (await val(fp, 'Name')) === 'Couch' && (await val(fp, 'Höhe')) === '0,95' && (await val(fp, 'Rotation')) === '90' && (await val(fp, 'X-Position')) === (targetX === '3' ? '3,00' : '2,80'));
 
 // ---------- 7. Neue Aktion nach Undo verwirft Redo ----------
 await undo();

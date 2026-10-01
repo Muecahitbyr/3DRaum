@@ -11,7 +11,7 @@ export type ObjectRef =
  * Art eines Kollisionskörpers. Ein Objekt kann mehrere haben (eine Tür z. B.
  * ihre Lage in der Wand und ihren Schwenkbereich).
  */
-export type ColliderKind = 'furniture' | 'openingSpan' | 'doorSwing' | 'windowZone' | 'radiator' | 'wall';
+export type ColliderKind = 'furniture' | 'furnitureEnvelope' | 'openingSpan' | 'doorSwing' | 'windowZone' | 'radiator' | 'wall';
 
 /** Konvexes Polygon im Grundriss (Weltkoordinaten x/z). */
 export type Polygon = readonly FloorPoint[];
@@ -27,6 +27,8 @@ export interface Collider {
   footprint: Polygon;
   /** Höhenbereich; Kollision nur, wenn sich auch diese Bereiche überschneiden. */
   height: HeightRange;
+  /** Bauteil (semantische Zone eines Möbels, z. B. „Platte“, „Bein“) – für Tests und Fehlersuche. */
+  part?: string;
 }
 
 export type CollisionSeverity = 'error' | 'warning';

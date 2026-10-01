@@ -45,8 +45,9 @@ export const COLLISION_RULES: readonly CollisionRule[] = [
     },
   },
   {
+    // Ganze Hülle des Möbels: Auch eine Tischplatte über dem Heizkörper staut die Wärme.
     id: 'radiator-covered',
-    kinds: ['furniture', 'radiator'],
+    kinds: ['furnitureEnvelope', 'radiator'],
     severity: 'error',
     messages: {
       subject: (names) => `Dieses Möbel überschneidet sich mit ${names}.`,

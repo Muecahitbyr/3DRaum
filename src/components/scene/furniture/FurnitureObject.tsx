@@ -13,6 +13,8 @@ import { useFurnitureInteraction } from '../interaction/FurnitureInteractionProv
 import { FurnitureModel } from './FurnitureModel';
 import { FurniturePlanSymbol } from './plan/FurniturePlanSymbol';
 import { RotationHandle } from './RotationHandle';
+import { FootprintOutline, RotationRing } from './RotationRing';
+
 
 /** Abstand der Auswahl-Umrandung zum Modell. */
 const SELECTION_PADDING = 0.02;
@@ -33,6 +35,8 @@ interface FurnitureObjectProps {
   moveIds: (item: FurnitureItem) => string[];
   /** Kollisionsstatus aus dem zentralen Kollisionsbericht. */
   status: CollisionSeverity | null;
+  /** Tischlampe auf einem Träger: dessen Oberkante (sonst gespeicherte Standhöhe). */
+  supportY?: number;
   onPick: (id: string, mode: FurniturePickMode) => void;
 }
 
@@ -40,26 +44,30 @@ interface FurnitureObjectProps {
  * Ein Möbel in der Szene. Memoisiert: Beim Ziehen eines Möbels rendern nur das gezogene
  * und Möbel mit geändertem Zustand neu (unveränderte Möbel behalten ihre Objektidentität).
  */
-export const FurnitureObject = memo(function FurnitureObject({ item, room, variant, selected, soleSelection, moveIds, status, onPick }: FurnitureObjectProps) {
+export const FurnitureObject = memo(function FurnitureObject({ item, room, variant, selected, soleSelection, moveIds, status, supportY, onPick }: FurnitureObjectProps) {
   const isPlan = variant === 'plan';
   const interaction = useFurnitureInteraction();
   const [hovered, setHovered] = useState(false);
-  useCursor(hovered, isPlan && interaction ? 'grab' : 'pointer');
+  // Greifen: im Grundriss jedes Möbel, in 3D nur ein bereits ausgewähltes.
+  const grabbable = !!interaction && (isPlan || selected);
+  useCursor(hovered, grabbable ? 'grab' : 'pointer');
   const world = furnitureToWorld(item.position, room);
-  // Deckenleuchten hängen an der Decke, Tischlampen stehen erhöht – beides folgt der Raumhöhe.
-  const baseY = furnitureBaseY(item, room.dimensions.height);
+  // Deckenleuchten hängen an der Decke, Tischlampen stehen erhöht bzw. auf ihrem Träger.
+  const baseY = furnitureBaseY(item, room.dimensions.height, supportY);
 
-  // 3D: Klick wählt aus (Shift ergänzt). Im Grundriss erledigt das bereits pointerdown.
+  // Klick wählt aus (Shift ergänzt) – außer pointerdown hat das bereits erledigt (Greifen).
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
-    if (isPlan && interaction) return;
+    if (grabbable) return;
     if (event.delta <= CLICK_DRAG_TOLERANCE_PX) onPick(item.id, event.shiftKey ? 'toggle' : 'replace');
   };
 
-  // Grundriss: linke Maustaste greift das Möbel (Auswahl + Verschieben – bei Mehrfachauswahl
-  // bzw. Gruppe alle gemeinsam). Shift+Klick ergänzt/entfernt nur. Andere Tasten bleiben der Kamera.
+  // Linke Maustaste bzw. Finger greift das Möbel (Auswahl + Verschieben – bei Mehrfachauswahl
+  // bzw. Gruppe alle gemeinsam); Shift ergänzt/entfernt nur. In 3D erst nach dem Auswählen –
+  // ein Ziehen über ein nicht ausgewähltes Möbel dreht weiterhin die Kamera.
   const handlePointerDown = (event: ThreeEvent<PointerEvent>) => {
-    if (!isPlan || !interaction || event.button !== 0) return;
+    if (!interaction || event.button !== 0) return;
+    if (!isPlan && !selected) return;
     event.stopPropagation();
     if (event.shiftKey) {
       onPick(item.id, 'toggle');
@@ -69,6 +77,7 @@ export const FurnitureObject = memo(function FurnitureObject({ item, room, varia
     onPick(item.id, 'focus');
     interaction.startMove(item, event, ids);
   };
+  const rotating = interaction?.active?.kind === 'rotate' && interaction.active.id === item.id;
 
   return (
     <group
@@ -92,6 +101,27 @@ export const FurnitureObject = memo(function FurnitureObject({ item, room, varia
       ) : (
         <>
           <FurnitureModel item={item} />
+          {/* 3D Bearbeiten: Grundfläche auf dem Boden und – bei einzelner Auswahl – Drehring. */}
+          {interaction && selected && (
+            <group position-y={-baseY}>
+              <FootprintOutline
+                width={item.width}
+                depth={item.depth}
+                color={status === 'error' ? SCENE_COLORS.conflict : status === 'warning' ? SCENE_COLORS.warning : SCENE_COLORS.selection}
+              />
+              {soleSelection && (
+                <RotationRing
+                  innerRadius={Math.hypot(item.width, item.depth) / 2}
+                  rotating={rotating}
+                  angle={item.rotationDeg}
+                  testId="rotation-handle-3d"
+                  onStart={(event) =>
+                    interaction.startRotate(item, { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType })
+                  }
+                />
+              )}
+            </group>
+          )}
           {/* Unsichtbare Bounding Box: großzügige Klickfläche und dezente Auswahl-Umrandung. */}
           <mesh name="furniture-bounds" position={[0, item.height / 2, 0]}>
             <boxGeometry

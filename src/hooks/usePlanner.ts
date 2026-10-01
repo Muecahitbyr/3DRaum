@@ -16,6 +16,7 @@ import type { FloorPoint, Meters, RoomDimensionKey, RoomShape } from '../types/r
 import { roomModelOf } from '../utils/room/model';
 import type { AlignMode } from '../utils/furnitureFormation';
 import type { LShapeDimensions } from '../utils/room/plan';
+import type { FurnitureTransform } from '../utils/furnitureRotation';
 
 /** Planungszustand mit Verlauf + stabile Aktionen für Komponenten. */
 export function usePlanner() {
@@ -51,6 +52,11 @@ export function usePlanner() {
       /** Gemeinsame Verschiebung; die Formation bleibt vollständig im Raum. */
       moveFurniture: (ids: string[], delta: FloorPoint) => dispatch({ type: 'moveFurniture', ids, delta }),
       setFurniturePositions: (positions: Record<string, FloorPoint>) => dispatch({ type: 'setFurniturePositions', positions }),
+      /** Gemeinsames Drehen (Geste): Position und Drehung je Möbel. */
+      setFurnitureTransforms: (transforms: Record<string, FurnitureTransform>) => dispatch({ type: 'setFurnitureTransforms', transforms }),
+      /** Auswahl bzw. Gruppe um ihre Mitte drehen (z. B. ±90°). */
+      rotateFurnitureMany: (ids: string[], deltaDeg: number) => dispatch({ type: 'rotateFurnitureMany', ids, deltaDeg }),
+      renameGroup: (groupId: string, name: string) => dispatch({ type: 'renameGroup', groupId, name }),
       alignFurniture: (ids: string[], mode: AlignMode) => dispatch({ type: 'alignFurniture', ids, mode }),
       groupFurniture: (ids: string[]) => dispatch({ type: 'groupFurniture', ids }),
       ungroupFurniture: (groupId: string) => dispatch({ type: 'ungroupFurniture', groupId }),

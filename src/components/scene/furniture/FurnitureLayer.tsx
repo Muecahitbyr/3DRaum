@@ -6,6 +6,7 @@ import type { RoomModel } from '../../../utils/room/model';
 import type { RoomVariant } from '../room/Room';
 import { isCeilingMounted } from '../../../config/furniture';
 import { furnitureBaseY, furnitureRotationY, furnitureToWorld } from '../../../utils/furniture';
+import { supportElevations } from '../../../utils/furnitureSupport';
 import { ContactShadow } from './ContactShadow';
 import { FurnitureObject } from './FurnitureObject';
 
@@ -30,6 +31,8 @@ export function FurnitureLayer({
   onPick,
 }: FurnitureLayerProps) {
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
+  // Tischlampen auf Trägern (Nachttisch, Schreibtisch …) stehen auf deren Oberseite.
+  const support = useMemo(() => supportElevations(furniture, room.dimensions.height), [furniture, room.dimensions.height]);
   const groupOf = useMemo(() => {
     const map = new Map<string, readonly string[]>();
     for (const group of groups) for (const id of group.memberIds) map.set(id, group.memberIds);
@@ -55,6 +58,7 @@ export function FurnitureLayer({
           soleSelection={selectedIds.length === 1}
           moveIds={moveIds}
           status={severityById.get(item.id) ?? null}
+          supportY={support.get(item.id)}
           onPick={onPick}
         />
       ))}
@@ -62,7 +66,7 @@ export function FurnitureLayer({
         // Kontaktschatten als eigene Ebene – nicht Teil der Möbelgruppen (deren Maße bleiben exakt).
         <group name="contact-shadows">
           {furniture.map((item) => {
-            if (isCeilingMounted(item.type) || furnitureBaseY(item, room.dimensions.height) !== 0) return null;
+            if (isCeilingMounted(item.type) || furnitureBaseY(item, room.dimensions.height, support.get(item.id)) !== 0) return null;
             const world = furnitureToWorld(item.position, room);
             return (
               <group key={item.id} position={[world.x, 0, world.z]} rotation-y={furnitureRotationY(item.rotationDeg)} userData={{ shadowOf: item.id }}>

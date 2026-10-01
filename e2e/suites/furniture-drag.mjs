@@ -99,7 +99,9 @@ for (const [type, [tx, tz, name]] of Object.entries(targets)) {
   await addFurniture(page, type); await settle(200);
   idOf[type] = await lastId();
   const before = await labels();
-  const live = await drag({ x: 2.5, z: 2 }, { x: tx, z: tz }, { during: async () => ({ ...(await pos()), guides: await guides() }) });
+  // V1.1: Neue Möbel stehen auf dem nächsten freien Platz (nicht immer exakt in der Mitte) → ab dort ziehen.
+  const start = await pos();
+  const live = await drag({ x: start.x, z: start.z }, { x: tx, z: tz }, { during: async () => ({ ...(await pos()), guides: await guides() }) });
   const p = await pos();
   check(`${name} verschoben nach (${tx}, ${tz})`, near(p.x, tx) && near(p.z, tz), `→ ${p.x.toFixed(2)} / ${p.z.toFixed(2)}`);
   check(`${name}: X/Z live in der Sidebar`, near(live.x, tx) && near(live.z, tz), `live ${live.x.toFixed(2)} / ${live.z.toFixed(2)}`);
@@ -217,12 +219,15 @@ p = await pos();
 await page.mouse.click(1380, 870); await settle(250);
 check('Klick ins Leere hebt Auswahl auf, Handle verschwindet', (await selectedName()) === null && (await page.getByTestId('rotation-handle').count()) === 0);
 
-// ---------- 7. 3D unverändert ----------
+// ---------- 7. 3D: Ziehen auf einem NICHT ausgewählten Möbel dreht die Kamera ----------
+// (V1.1 Block B: Ein ausgewähltes Möbel wird in 3D verschoben – geprüft in „Möbel realistisch platzieren“.)
 await selectItem(0);
 await toggle('3D');
-check('3D: kein Rotations-Handle', (await page.getByTestId('rotation-handle').count()) === 0);
-const cam0 = await page.evaluate(() => window.__PLANNER_R3F__().camera.position.toArray());
+check('3D: kein 2D-Rotations-Handle (in 3D Drehring statt Griff am Möbel)', (await page.getByTestId('rotation-handle').count()) === 0 && (await page.getByTestId('rotation-handle-3d').count()) === 1);
 const p3 = await pos();
+await page.mouse.click(1400, 880); await settle(400); // Auswahl aufheben (freie Fläche)
+check('3D: Klick ins Leere hebt die Auswahl auf', (await selectedName()) === null);
+const cam0 = await page.evaluate(() => window.__PLANNER_R3F__().camera.position.toArray());
 const s3 = await page.evaluate((id) => {
   const s = window.__PLANNER_R3F__(); const g = s.scene.getObjectByName(id);
   const v = g.localToWorld(s.camera.position.clone().set(0, 0.4, 0)).project(s.camera); const r = s.gl.domElement.getBoundingClientRect();
@@ -230,8 +235,9 @@ const s3 = await page.evaluate((id) => {
 }, idOf.bed);
 await page.mouse.move(s3.x, s3.y); await page.mouse.down(); await page.mouse.move(s3.x + 120, s3.y, { steps: 8 }); await page.mouse.up(); await settle(800);
 const cam1 = await page.evaluate(() => window.__PLANNER_R3F__().camera.position.toArray());
+await selectItem(0);
 const q3 = await pos();
-check('3D: Ziehen auf Möbel dreht die Kamera, Möbel bleibt stehen', near(q3.x, p3.x, 1e-9) && near(q3.z, p3.z, 1e-9) && cam0.some((v, i) => Math.abs(v - cam1[i]) > 0.05));
+check('3D: Ziehen auf nicht ausgewähltem Möbel dreht die Kamera, Möbel bleibt stehen', near(q3.x, p3.x, 1e-9) && near(q3.z, p3.z, 1e-9) && cam0.some((v, i) => Math.abs(v - cam1[i]) > 0.05));
 await toggle('2D');
 check('Zurück in 2D: Handle wieder da', (await page.getByTestId('rotation-handle').count()) === 1);
 await shot('fd-final');

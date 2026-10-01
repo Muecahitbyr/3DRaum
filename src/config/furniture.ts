@@ -1,3 +1,4 @@
+import type { FurnitureCollisionShape } from '../collision/furnitureZones';
 import type { FurnitureColorSlot, FurnitureSize, FurnitureType, LampLight } from '../types/furniture';
 import type { Meters } from '../types/room';
 
@@ -24,6 +25,13 @@ export interface FurnitureDefinition {
   lamp?: { light: LampLight; candela: number; /** Lage der Lichtquelle als Anteil der Höhe (von unten). */ sourceAt: number };
   /** Tischlampe: Standardstandhöhe und Grenzen. */
   elevation?: { default: Meters; limits: [Meters, Meters] };
+  /**
+   * Semantische Kollisionszonen (siehe collision/furnitureZones.ts): z. B. `table` = Platte +
+   * Beine, darunter unterfahrbar; `chair` = Sitzteil passt unter eine Platte. Standard: fester Quader.
+   */
+  collision?: FurnitureCollisionShape;
+  /** Nutzbare Oberseite: Eine Tischlampe darüber steht automatisch darauf. */
+  surface?: boolean;
 }
 
 export type FurnitureCategoryId = 'living' | 'bedroom' | 'dining' | 'office' | 'lamps';
@@ -77,6 +85,8 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     keywords: ['Tisch', 'Wohnzimmertisch', 'Beistelltisch'],
     defaultSize: { width: 1.1, depth: 0.6, height: 0.45 },
     limits: { width: [0.4, 1.8], depth: [0.4, 1.2], height: [0.3, 0.6] },
+    // Platte zu tief für Sitzmöbel – bleibt ein fester Quader (siehe collision/furnitureZones.ts).
+    surface: true,
     model: procedural,
     colorSlots: [{ slot: 'wood', label: 'Oberfläche', default: '#c09468' }],
   },
@@ -86,6 +96,7 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     keywords: ['Lowboard', 'Fernseher', 'Fernsehschrank', 'Medienmöbel', 'Schrank'],
     defaultSize: { width: 1.8, depth: 0.4, height: 0.5 },
     limits: { width: [0.8, 3], depth: [0.3, 0.6], height: [0.3, 0.8] },
+    surface: true,
     model: procedural,
     colorSlots: [{ slot: 'main', label: 'Korpus', default: '#f2efea' }],
   },
@@ -132,6 +143,7 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     keywords: ['Schubladen', 'Schubladenkommode', 'Schrank'],
     defaultSize: { width: 1, depth: 0.45, height: 0.85 },
     limits: { width: [0.4, 2.2], depth: [0.3, 0.6], height: [0.5, 1.3] },
+    surface: true,
     model: procedural,
     colorSlots: [{ slot: 'main', label: 'Korpus', default: '#f2efea' }, { slot: 'wood', label: 'Deckplatte', default: '#c09468' }],
   },
@@ -141,6 +153,7 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     keywords: ['Nachtschrank', 'Nachtkästchen', 'Schrank'],
     defaultSize: { width: 0.45, depth: 0.4, height: 0.55 },
     limits: { width: [0.3, 0.7], depth: [0.3, 0.55], height: [0.35, 0.8] },
+    surface: true,
     model: procedural,
     colorSlots: [{ slot: 'wood', label: 'Korpus', default: '#c09468' }],
   },
@@ -151,6 +164,8 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     keywords: ['Tisch', 'Küchentisch'],
     defaultSize: { width: 1.4, depth: 0.8, height: 0.75 },
     limits: { width: [0.4, 4], depth: [0.4, 2], height: [0.4, 1.2] },
+    collision: 'table',
+    surface: true,
     model: procedural,
     colorSlots: [{ slot: 'wood', label: 'Oberfläche', default: '#c7a078' }],
   },
@@ -160,6 +175,7 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     keywords: ['Esszimmerstuhl', 'Sitz'],
     defaultSize: { width: 0.45, depth: 0.52, height: 0.9 },
     limits: { width: [0.38, 0.6], depth: [0.4, 0.65], height: [0.75, 1.1] },
+    collision: 'chair',
     model: procedural,
     colorSlots: [{ slot: 'fabric', label: 'Sitz', default: '#d9cbb5' }, { slot: 'wood', label: 'Gestell', default: '#c09468' }],
   },
@@ -169,6 +185,7 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     keywords: ['Anrichte', 'Kommode', 'Schrank'],
     defaultSize: { width: 1.6, depth: 0.45, height: 0.8 },
     limits: { width: [0.8, 2.6], depth: [0.35, 0.6], height: [0.6, 1.1] },
+    surface: true,
     model: procedural,
     colorSlots: [{ slot: 'wood', label: 'Korpus', default: '#c09468' }],
   },
@@ -179,6 +196,8 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     keywords: ['Tisch', 'Arbeitsplatz', 'Bürotisch'],
     defaultSize: { width: 1.4, depth: 0.7, height: 0.75 },
     limits: { width: [0.8, 2.4], depth: [0.5, 1], height: [0.6, 0.9] },
+    collision: 'desk',
+    surface: true,
     model: procedural,
     colorSlots: [{ slot: 'wood', label: 'Platte', default: '#c09468' }, { slot: 'main', label: 'Korpus', default: '#f2efea' }],
   },
@@ -188,6 +207,7 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     keywords: ['Drehstuhl', 'Schreibtischstuhl', 'Stuhl'],
     defaultSize: { width: 0.65, depth: 0.65, height: 1.1 },
     limits: { width: [0.5, 0.8], depth: [0.5, 0.8], height: [0.85, 1.35] },
+    collision: 'office-chair',
     model: procedural,
     colorSlots: [{ slot: 'fabric', label: 'Bezug', default: '#3e4a5b' }],
   },

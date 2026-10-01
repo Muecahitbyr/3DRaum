@@ -144,6 +144,8 @@ export function PerspectiveView({ active, fitShape, fitToken, preview = false, r
         <OrbitControls
           ref={controlsRef}
           camera={camera}
+          // Als Standard-Steuerung registriert, damit das Ziehen/Drehen von Möbeln sie pausieren kann.
+          makeDefault={active}
           enabled={active}
           enableDamping
           dampingFactor={0.1}

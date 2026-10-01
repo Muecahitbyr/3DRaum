@@ -147,9 +147,13 @@ export function furnitureColor(item: Pick<FurnitureItem, 'type' | 'colors'>, slo
   return item.colors?.[slot] ?? definition.default;
 }
 
-/** Unterkante über dem Boden: Deckenleuchten hängen von der Decke, Tischlampen stehen erhöht. */
-export function furnitureBaseY(item: Pick<FurnitureItem, 'type' | 'height' | 'elevation'>, roomHeight: number): number {
+/**
+ * Unterkante über dem Boden: Deckenleuchten hängen von der Decke, Tischlampen stehen erhöht –
+ * auf einem Träger (`supportY`, siehe utils/furnitureSupport.ts) automatisch auf dessen Oberseite.
+ */
+export function furnitureBaseY(item: Pick<FurnitureItem, 'type' | 'height' | 'elevation'>, roomHeight: number, supportY?: number): number {
   if (isCeilingMounted(item.type)) return roomHeight - item.height;
+  if (supportY !== undefined && FURNITURE_CATALOG[item.type].elevation) return supportY;
   return item.elevation ?? 0;
 }
 

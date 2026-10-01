@@ -21,6 +21,8 @@ interface FurniturePropertiesPanelProps {
   collisionMessages: readonly CollisionMessage[];
   /** Gruppe, zu der das Möbel gehört (falls vorhanden). */
   group?: FurnitureGroup | null;
+  /** Tischlampe auf einem Träger (Name, Oberkante). */
+  support?: { name: string; height: number } | null;
   onChange: (id: string, patch: FurniturePatch) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -34,6 +36,7 @@ export function FurniturePropertiesPanel({
   room,
   collisionMessages,
   group = null,
+  support = null,
   onChange,
   onDelete,
   onDuplicate,
@@ -99,7 +102,7 @@ export function FurniturePropertiesPanel({
       </div>
       <p className={styles.hint}>Mittelpunkt, gemessen ab linker (X) bzw. oberer (Z) Innenwand im Grundriss.</p>
 
-      <FurnitureAppearance item={item} roomHeight={room.dimensions.height} onChange={update} />
+      <FurnitureAppearance item={item} roomHeight={room.dimensions.height} support={support} onChange={update} />
 
       <AlignmentTools onAlign={(mode) => onAlign(item.id, mode)} />
 

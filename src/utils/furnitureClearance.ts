@@ -6,7 +6,9 @@ import type { RoomFixture } from '../types/fixture';
 import type { FurnitureItem } from '../types/furniture';
 import type { FloorPoint, Meters } from '../types/room';
 import { fixtureFootprint, getFixtureDisplayName } from './fixtures';
+import { furnitureCollide } from '../collision';
 import { furnitureBaseY } from './furniture';
+import { supportElevations } from './furnitureSupport';
 import type { RoomModel } from './room/model';
 
 /**
@@ -148,16 +150,24 @@ export function computeClearances(
   const center = centerOf(footprint);
   // Nur Hindernisse in derselben Höhe: Pendelleuchte über dem Tisch, Tischlampe auf der Kommode stören nicht.
   const H = room.dimensions.height;
-  const y0 = furnitureBaseY(item, H);
+  const support = supportElevations(all, H);
+  const y0 = furnitureBaseY(item, H, support.get(item.id));
   const y1 = y0 + item.height;
+  // Drei Fälle: geometrischer Abstand (getrennte Grundflächen), erlaubte Überdeckung
+  // (Grundflächen überdecken sich, die Bauteile aber nicht – Stuhl unter dem Tisch: wird
+  // übergangen) und echte Kollision (Konflikt) nach dem semantischen Kollisionsmodell.
   const others = all
     .filter((f) => f.id !== item.id)
     .filter((f) => {
-      const b0 = furnitureBaseY(f, H);
+      const b0 = furnitureBaseY(f, H, support.get(f.id));
       return Math.min(y1, b0 + f.height) - Math.max(y0, b0) > 1e-4;
     })
     .map((f) => ({ item: f, polygon: furnitureFootprint(f) }))
-    .map((o) => ({ ...o, overlaps: polygonsOverlap(footprint, o.polygon, COLLISION_CONFIG.touchTolerance) }));
+    .map((o) => {
+      const overlaps = polygonsOverlap(footprint, o.polygon, COLLISION_CONFIG.touchTolerance);
+      return { ...o, overlaps, colliding: overlaps && furnitureCollide(item, o.item, room, all) };
+    })
+    .filter((o) => !o.overlaps || o.colliding);
   // Heizkörper sind feste Hindernisse vor der Wand.
   const obstacles = fixtures
     .filter((f) => FIXTURE_CATALOG[f.type].collides && Math.min(y1, f.elevation + f.height) - Math.max(y0, f.elevation) > 1e-4)

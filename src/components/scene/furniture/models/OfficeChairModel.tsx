@@ -1,5 +1,5 @@
 import { FURNITURE_COLORS as C } from '../../../../config/furniture';
-import { clamp } from '../../../../utils/units';
+import { officeChairGeometry } from '../../../../config/furnitureGeometry';
 import { Ball, Part, Rod, SoftPart, colorOf } from './parts';
 import type { FurnitureModelProps } from './types';
 
@@ -12,10 +12,8 @@ const SPOKE_Y = 0.065;
  */
 export function OfficeChairModel({ width: w, depth: d, height: h, colors }: FurnitureModelProps) {
   const fabric = colorOf(colors, 'fabric', C.officeFabric);
-  const seatH = clamp(h * 0.44, 0.42, 0.55);
-  const seatT = 0.08;
-  const backH = h - seatH - 0.08;
-  const armH = 0.2;
+  // Maße gemeinsam mit den Kollisionszonen (Armlehnen unter der Schreibtischplatte).
+  const { seatH, seatT, backH, armH, backDepth } = officeChairGeometry(h);
 
   // Ein Stern zeigt nach vorn (+z); Speichen enden auf einer Ellipse im Grundriss.
   const spokes = Array.from({ length: 5 }, (_, k) => {
@@ -36,7 +34,7 @@ export function OfficeChairModel({ width: w, depth: d, height: h, colors }: Furn
       <Rod position={[0, SPOKE_Y, 0]} radius={0.045} height={0.05} color={C.metal} />
       <Rod position={[0, (SPOKE_Y + seatH - seatT) / 2, 0]} radius={0.022} height={seatH - seatT - SPOKE_Y} color={C.chrome} />
       <SoftPart position={[0, seatH - seatT / 2, 0.02]} size={[w * 0.8, seatT, d * 0.72]} color={fabric} radius={0.03} />
-      <SoftPart position={[0, h - backH / 2, -d / 2 + 0.035]} size={[w * 0.72, backH, 0.07]} color={fabric} radius={0.03} />
+      <SoftPart position={[0, h - backH / 2, -d / 2 + backDepth / 2]} size={[w * 0.72, backH, backDepth]} color={fabric} radius={0.03} />
       <Part position={[0, seatH + 0.02, -d / 2 + 0.09]} size={[0.05, 0.14, 0.03]} color={C.metal} roughness={0.4} />
       {[-1, 1].map((sx) => (
         <group key={sx}>

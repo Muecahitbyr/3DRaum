@@ -135,6 +135,9 @@ export function Wall({
         castShadow={!isPlan && interactive}
         receiveShadow
         onClick={interactive ? handleClick : undefined}
+        // 3D: Eine sichtbare Wand verdeckt Möbel dahinter auch fürs Greifen (sonst würde ein
+        // ausgewähltes Möbel hinter der Wand gezogen). Die Kamera erhält das Ereignis weiterhin.
+        onPointerDown={interactive && !isPlan ? (event) => event.stopPropagation() : undefined}
         onPointerOver={
           interactive
             ? (event) => {

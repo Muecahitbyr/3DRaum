@@ -1,16 +1,14 @@
 import { FURNITURE_COLORS as C } from '../../../../config/furniture';
-import { clamp } from '../../../../utils/units';
+import { chairGeometry } from '../../../../config/furnitureGeometry';
 import { Part, SoftPart, colorOf } from './parts';
 import type { FurnitureModelProps } from './types';
-
-const LEG = 0.03;
 
 /** Stuhl: vier Beine, gepolsterte Sitzfläche, Rückenlehne hinten (−z). */
 export function ChairModel({ width: w, depth: d, height: h, colors }: FurnitureModelProps) {
   const wood = colorOf(colors, 'wood', C.oak);
   const seat = colorOf(colors, 'fabric', C.chairSeat);
-  const seatH = clamp(h * 0.5, 0.4, 0.5);
-  const seatT = 0.045;
+  // Maße gemeinsam mit den Kollisionszonen (Sitzhöhe unter der Tischplatte).
+  const { leg: LEG, seatH, seatT } = chairGeometry(h);
   const legH = seatH - seatT;
   const backH = h - seatH;
   const panelH = backH * 0.45;

@@ -37,6 +37,7 @@ import { useProjectSession } from './hooks/useProjectSession';
 import type { ViewMode } from './types/view';
 import { getFixtureDisplayName } from './utils/fixtures';
 import { getOpeningDisplayName } from './utils/openingLabels';
+import { supportOf } from './utils/furnitureSupport';
 
 /** Eigenschaften-Bereiche der Seitenleiste (Möbel, Mehrfachauswahl, Tür/Fenster, Raumobjekt, Wand). */
 const SELECTION_PANELS = [
@@ -204,6 +205,9 @@ export function App() {
   );
 
   const multiSelection = selectedFurnitureIds.length > 1;
+  // Tischlampe auf einem Träger: Hinweis in den Eigenschaften (Standhöhe automatisch).
+  const supportItem = selectedFurniture ? supportOf(selectedFurniture, state.furniture) : null;
+  const selectedSupport = supportItem ? { name: supportItem.name, height: supportItem.height } : null;
   const selectedItems = multiSelection ? state.furniture.filter((f) => selectedFurnitureIds.includes(f.id)) : [];
   // Schmale Bildschirme: Name der Auswahl im Chip „… bearbeiten“.
   const selectionName = multiSelection
@@ -306,6 +310,7 @@ export function App() {
               room={room}
               collisionMessages={describeCollisions({ type: 'furniture', id: selectedFurniture.id }, collisions, nameOf)}
               group={state.groups.find((g) => g.memberIds.includes(selectedFurniture.id)) ?? null}
+              support={selectedSupport}
               onChange={actions.updateFurniture}
               onDelete={actions.removeFurniture}
               onDuplicate={(id) => actions.duplicateFurniture([id])}
@@ -323,6 +328,8 @@ export function App() {
               onDuplicate={actions.duplicateFurniture}
               onDelete={actions.removeFurnitureMany}
               onAlign={actions.alignFurniture}
+              onRotate={actions.rotateFurnitureMany}
+              onRenameGroup={actions.renameGroup}
               onClose={clearSelection}
             />
           )}
@@ -424,6 +431,7 @@ export function App() {
           onUpdateFixture={actions.updateFixture}
           onUpdateFurniture={actions.updateFurniture}
           onSetFurniturePositions={actions.setFurniturePositions}
+          onSetFurnitureTransforms={actions.setFurnitureTransforms}
           onGestureStart={startGesture}
           onGestureEnd={endGesture}
           viewMode={viewMode}

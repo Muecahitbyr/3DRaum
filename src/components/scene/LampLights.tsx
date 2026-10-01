@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { FURNITURE_CATALOG } from '../../config/furniture';
 import type { FurnitureItem } from '../../types/furniture';
 import { furnitureBaseY, furnitureToWorld, lampLightColor } from '../../utils/furniture';
+import { supportElevations } from '../../utils/furnitureSupport';
 import type { RoomModel } from '../../utils/room/model';
 
 /** Höchstens so viele Lichtquellen gleichzeitig (Leistung): die hellsten Lampen gewinnen. */
@@ -18,6 +19,7 @@ export function LampLights({ furniture, room, enabled }: { furniture: readonly F
   const slots = lamps.length === 0 ? 0 : lamps.length <= 2 ? 2 : lamps.length <= 4 ? 4 : MAX_LAMP_LIGHTS;
   const active = useMemo(() => {
     const H = room.dimensions.height;
+    const support = supportElevations(furniture, H);
     return lamps
       .filter((f) => f.light?.on)
       .map((f) => {
@@ -25,14 +27,14 @@ export function LampLights({ furniture, room, enabled }: { furniture: readonly F
         const world = furnitureToWorld(f.position, room);
         return {
           id: f.id,
-          position: [world.x, furnitureBaseY(f, H) + f.height * lamp.sourceAt, world.z] as [number, number, number],
+          position: [world.x, furnitureBaseY(f, H, support.get(f.id)) + f.height * lamp.sourceAt, world.z] as [number, number, number],
           color: lampLightColor(f.light!.temperature),
           intensity: lamp.candela * f.light!.intensity,
         };
       })
       .sort((a, b) => b.intensity - a.intensity || a.id.localeCompare(b.id))
       .slice(0, slots);
-  }, [lamps, room, slots]);
+  }, [lamps, furniture, room, slots]);
 
   return (
     <group name="lamp-lights">

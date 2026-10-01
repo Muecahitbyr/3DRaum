@@ -321,7 +321,8 @@ function readGroup(value: unknown, furnitureIds: Set<string>, used: Set<string>)
   const memberIds = [...new Set(value.memberIds.filter((id): id is string => typeof id === 'string' && furnitureIds.has(id) && !used.has(id)))];
   if (memberIds.length < 2) return null;
   memberIds.forEach((id) => used.add(id));
-  return { id: value.id, name: nonEmptyString(value.name) ? value.name.trim() : 'Gruppe', memberIds };
+  // Name optional: fehlt er, gilt „Gruppe“ (ältere Projekte); Länge wie in der Oberfläche.
+  return { id: value.id, name: nonEmptyString(value.name) ? value.name.trim().slice(0, 40) : 'Gruppe', memberIds };
 }
 
 function readFurniture(value: unknown, room: RoomModel, shift: FloorPoint): FurnitureItem | null {

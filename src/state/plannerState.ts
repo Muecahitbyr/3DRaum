@@ -17,6 +17,8 @@ import type { FloorPoint, Meters, RoomDimensionKey, RoomPlan, RoomShape } from '
 import { sameValues } from '../utils/equality';
 import { createFixture, normalizeFixture } from '../utils/fixtures';
 import { createFurniture, normalizeFurniture } from '../utils/furniture';
+import { findFreePosition } from '../utils/furniturePlacement';
+import { formationCenter, rotateFormation, type FurnitureTransform } from '../utils/furnitureRotation';
 import { alignmentDelta, clampFormationDelta, moveFormation, nextCopyName, type AlignMode } from '../utils/furnitureFormation';
 import { createOpening, normalizeOpening } from '../utils/openings';
 import { roomModelOf, type RoomModel } from '../utils/room/model';
@@ -113,9 +115,14 @@ export type PlannerAction =
   | { type: 'pasteFurniture'; clipboard: FurnitureClipboard; offset: FloorPoint }
   | { type: 'moveFurniture'; ids: string[]; delta: FloorPoint }
   | { type: 'setFurniturePositions'; positions: Record<string, FloorPoint> }
+  /** Position und Drehung mehrerer Möbel (gemeinsames Drehen, bereits im Raum begrenzt). */
+  | { type: 'setFurnitureTransforms'; transforms: Record<string, FurnitureTransform> }
+  /** Auswahl/Gruppe um ihre Mitte drehen (Schaltflächen); nicht möglich → keine Änderung. */
+  | { type: 'rotateFurnitureMany'; ids: string[]; deltaDeg: number }
   | { type: 'alignFurniture'; ids: string[]; mode: AlignMode }
   | { type: 'groupFurniture'; ids: string[] }
   | { type: 'ungroupFurniture'; groupId: string }
+  | { type: 'renameGroup'; groupId: string; name: string }
   | { type: 'selectFurniture'; id: string; mode: FurniturePickMode; expandGroup: boolean }
   | { type: 'selectFurnitureMany'; ids: string[] }
   | { type: 'addFixture'; fixtureType: FixtureType }
@@ -188,6 +195,21 @@ function removeFurniture(state: PlannerState, ids: readonly string[]): PlannerSt
       ? furnitureSelection(state.selection.ids.filter((id) => !remove.has(id)), state.selection.id)
       : state.selection;
   return { ...state, furniture, groups: cleanGroups(state.groups, furniture), selection };
+}
+
+/** Höchstlänge eines Gruppennamens (z. B. „Essgruppe“, „Arbeitsplatz“). */
+export const GROUP_NAME_MAX_LENGTH = 40;
+
+/** Position und Drehung mehrerer Möbel setzen (gemeinsames Drehen) und normalisieren. */
+function applyTransforms(state: PlannerState, transforms: Record<string, FurnitureTransform>): PlannerState {
+  let changed = false;
+  const furniture = state.furniture.map((f) => {
+    const t = transforms[f.id];
+    if (!t || (t.position.x === f.position.x && t.position.z === f.position.z && t.rotationDeg === f.rotationDeg)) return f;
+    changed = true;
+    return normalizeFurniture({ ...f, position: t.position, rotationDeg: t.rotationDeg }, model(state));
+  });
+  return changed ? { ...state, furniture } : state;
 }
 
 /** Positionen setzen (bereits im Raum begrenzt) und normalisieren. */
@@ -360,7 +382,10 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
 
     case 'addFurniture': {
       const id = `furniture-${state.nextFurnitureNumber}`;
-      const item = createFurniture(action.furnitureType, id, state.furniture, model(state));
+      const created = createFurniture(action.furnitureType, id, state.furniture, model(state));
+      // Freier Platz nahe der Raummitte statt aller neuen Möbel exakt in der Mitte.
+      const position = findFreePosition(created, { room: model(state), furniture: state.furniture, openings: state.openings, fixtures: state.fixtures });
+      const item = position.x === created.position.x && position.z === created.position.z ? created : { ...created, position };
       return {
         ...state,
         furniture: [...state.furniture, item],
@@ -401,6 +426,16 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
     case 'setFurniturePositions':
       return applyPositions(state, action.positions);
 
+    case 'setFurnitureTransforms':
+      return applyTransforms(state, action.transforms);
+
+    case 'rotateFurnitureMany': {
+      const items = state.furniture.filter((f) => action.ids.includes(f.id));
+      if (items.length === 0) return state;
+      const transforms = rotateFormation(items, formationCenter(items), action.deltaDeg, model(state));
+      return transforms ? applyTransforms(state, transforms) : state;
+    }
+
     case 'alignFurniture': {
       const items = state.furniture.filter((f) => action.ids.includes(f.id));
       if (items.length === 0) return state;
@@ -416,6 +451,15 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
       );
       const group = { id: `group-${state.nextGroupNumber}`, name: `Gruppe ${state.nextGroupNumber}`, memberIds: ids };
       return { ...state, groups: [...others, group], nextGroupNumber: state.nextGroupNumber + 1 };
+    }
+
+    case 'renameGroup': {
+      // Wie Möbelnamen: beim Tippen nur vorne kürzen; leer → Standardname.
+      const groups = updateById(state.groups, action.groupId, (g) => ({
+        ...g,
+        name: action.name.trim() ? action.name.trimStart().slice(0, GROUP_NAME_MAX_LENGTH) : `Gruppe ${g.id.replace(/^group-/, '')}`,
+      }));
+      return groups === state.groups ? state : { ...state, groups };
     }
 
     case 'ungroupFurniture': {

@@ -270,6 +270,81 @@ async function measureFrames() {
   check('V1-Szenario: Möbelanzahl unverändert', (await page.getByTestId('furniture-list-item').count()) === 60);
 }
 
+// 6. Block B: 150 Möbel – 3D ziehen, 3D drehen, Gruppe drehen; Commits nur bei Bewegung,
+//    danach Ruhe (0 Commits, 0 Frames); Kollisionsbericht bleibt schnell.
+{
+  const furniture = [];
+  const kinds = [['chair', [0.45, 0.52, 0.9]], ['table', [0.9, 0.9, 0.75]], ['nightstand', [0.45, 0.4, 0.55]], ['office-chair', [0.6, 0.6, 1.1]], ['dresser', [0.7, 0.45, 0.85]]];
+  for (let i = 0; i < 150; i++) {
+    const [type, size] = kinds[i % kinds.length];
+    furniture.push(item(type, `Objekt ${i + 1}`, 0.6 + (i % 15) * 0.95, 0.6 + Math.floor(i / 15) * 0.95, (i % 4) * 90, size));
+  }
+  await openScene(page, project('perf-150', 'Block B 150', { walls: rectangleWalls(15, 10), furniture }));
+  await page.getByRole('button', { name: '3D', exact: true }).click(); await settle(1200);
+  const commitsDuring = async (action) => page.evaluate(() => window.__commits).then(async (c0) => { await action(); return (await page.evaluate(() => window.__commits)) - c0; });
+  const held = () => page.evaluate(async () => { const s = window.__commits; await new Promise((r) => setTimeout(r, 800)); return window.__commits - s; });
+  const framesIdle = () => page.evaluate(async () => { const s = window.__PLANNER_R3F__(); const f0 = s.gl.info.render.frame; await new Promise((r) => setTimeout(r, 1500)); return s.gl.info.render.frame - f0; });
+  const screen = (id, y) => page.evaluate(({ id, y }) => {
+    const s = window.__PLANNER_R3F__();
+    const v = s.scene.getObjectByName(id).getWorldPosition(s.camera.position.clone()).setY(y).project(s.camera);
+    const r = s.gl.domElement.getBoundingClientRect();
+    return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+  }, { id, y });
+  await page.getByTestId('furniture-list-item').filter({ hasText: 'Objekt 78' }).first().click(); await settle(400);
+  const id = furniture[77].id;
+  // 3D ziehen
+  const p = await screen(id, 0.3);
+  const steps = 15;
+  let heldMove = 0;
+  const moveCommits = await commitsDuring(async () => {
+    await page.mouse.move(p.x, p.y); await page.mouse.down();
+    for (let i = 1; i <= steps; i++) await page.mouse.move(p.x + i * 3, p.y + i);
+    await settle(300);
+    heldMove = await held();
+    await page.mouse.up(); await settle(400);
+  });
+  check(`150 Möbel, 3D ziehen: Commits nur bei Bewegung (gehalten ${heldMove}, ${steps} Bewegungen: ${moveCommits})`, heldMove === 0 && moveCommits / steps < 12, String(moveCommits));
+  check('150 Möbel, 3D ziehen: ein Verlaufsschritt', (await page.getByTestId('history-undo').getAttribute('title')).startsWith('Möbel verschieben'));
+  // 3D drehen am Ring
+  const k = await page.getByTestId('rotation-handle-3d').boundingBox();
+  const c = await screen(id, 0);
+  const kc = { x: k.x + k.width / 2, y: k.y + k.height / 2 };
+  const rotateCommits = await commitsDuring(async () => {
+    await page.mouse.move(kc.x, kc.y); await page.mouse.down();
+    for (let i = 1; i <= steps; i++) { const t = (i / steps) * (Math.PI / 2); await page.mouse.move(c.x + (kc.x - c.x) * Math.cos(t) - (kc.y - c.y) * Math.sin(t), c.y + (kc.x - c.x) * Math.sin(t) + (kc.y - c.y) * Math.cos(t)); }
+    await page.mouse.up(); await settle(400);
+  });
+  check(`150 Möbel, 3D drehen: Commits je Bewegung begrenzt (${steps} Bewegungen: ${rotateCommits})`, rotateCommits / steps < 12, String(rotateCommits));
+  // Gruppe (8 Möbel) gemeinsam drehen
+  await page.keyboard.down('Shift');
+  for (let i = 79; i <= 85; i++) await page.getByTestId('furniture-list-item').filter({ hasText: `Objekt ${i}` }).first().click();
+  await page.keyboard.up('Shift'); await settle(400);
+  const g = await page.getByTestId('formation-rotation-handle').boundingBox();
+  const gc = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
+  const groupCommits = await commitsDuring(async () => {
+    await page.mouse.move(gc.x, gc.y); await page.mouse.down();
+    for (let i = 1; i <= steps; i++) await page.mouse.move(gc.x + i * 6, gc.y + i * 4);
+    await page.mouse.up(); await settle(400);
+  });
+  check(`150 Möbel, Gruppe (8) drehen: Commits je Bewegung begrenzt (${steps} Bewegungen: ${groupCommits})`, groupCommits / steps < 12, String(groupCommits));
+  check('150 Möbel, Gruppendrehung: ein Verlaufsschritt „Möbel drehen“', (await page.getByTestId('history-undo').getAttribute('title')).startsWith('Möbel drehen'));
+  const idleCommits = await held();
+  const idleFrames = await framesIdle();
+  check(`150 Möbel, nach den Interaktionen: Ruhe (Commits ${idleCommits}, Frames ${idleFrames})`, idleCommits === 0 && idleFrames === 0);
+  const timing = await page.evaluate(async () => {
+    const c = await import('/src/collision/index.ts');
+    const m = await import('/src/utils/room/model.ts');
+    const p = await import('/src/utils/room/plan.ts');
+    const room = m.roomModelOf(p.createRectangleRoom({ width: 15, length: 10, height: 2.5 }));
+    const items = Array.from({ length: 150 }, (_, i) => ({ id: `f${i}`, type: ['chair', 'table', 'desk', 'office-chair', 'sofa'][i % 5], name: `${i}`, width: 0.6, depth: 0.6, height: 0.9, position: { x: 0.6 + (i % 15) * 0.95, z: 0.6 + Math.floor(i / 15) * 0.95 }, rotationDeg: (i % 4) * 90 }));
+    c.computeCollisionReport(room, [], items);
+    const t0 = performance.now();
+    for (let i = 0; i < 20; i++) c.computeCollisionReport(room, [], items.map((f, j) => (j === 40 ? { ...f, position: { x: f.position.x + i * 0.01, z: f.position.z } } : f)));
+    return (performance.now() - t0) / 20;
+  });
+  check(`150 Möbel: Kollisionsbericht bei einem bewegten Möbel < 10 ms (${timing.toFixed(2)} ms)`, timing < 10);
+}
+
 check('Keine Laufzeitfehler', errors.length === 0, errors.join(' | '));
 
 const failed = results.filter((x) => !x.ok).length;
