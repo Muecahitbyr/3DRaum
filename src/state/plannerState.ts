@@ -17,7 +17,7 @@ import type { FloorPoint, Meters, RoomDimensionKey, RoomPlan, RoomShape } from '
 import { sameValues } from '../utils/equality';
 import { createFixture, normalizeFixture } from '../utils/fixtures';
 import { createFurniture, normalizeFurniture } from '../utils/furniture';
-import { findFreePosition } from '../utils/furniturePlacement';
+import { findFreePlacement } from '../utils/furniturePlacement';
 import { formationCenter, rotateFormation, type FurnitureTransform } from '../utils/furnitureRotation';
 import { alignmentDelta, clampFormationDelta, moveFormation, nextCopyName, type AlignMode } from '../utils/furnitureFormation';
 import { createOpening, normalizeOpening } from '../utils/openings';
@@ -383,9 +383,10 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
     case 'addFurniture': {
       const id = `furniture-${state.nextFurnitureNumber}`;
       const created = createFurniture(action.furnitureType, id, state.furniture, model(state));
-      // Freier Platz nahe der Raummitte statt aller neuen Möbel exakt in der Mitte.
-      const position = findFreePosition(created, { room: model(state), furniture: state.furniture, openings: state.openings, fixtures: state.fixtures });
-      const item = position.x === created.position.x && position.z === created.position.z ? created : { ...created, position };
+      // Freier Platz (Wandmöbel an der Wand, sonst nahe der Raummitte) statt alle exakt in der Mitte.
+      const placement = findFreePlacement(created, { room: model(state), furniture: state.furniture, openings: state.openings, fixtures: state.fixtures });
+      const unchanged = placement.position.x === created.position.x && placement.position.z === created.position.z && placement.rotationDeg === created.rotationDeg;
+      const item = unchanged ? created : normalizeFurniture({ ...created, ...placement }, model(state));
       return {
         ...state,
         furniture: [...state.furniture, item],

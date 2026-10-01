@@ -19,13 +19,17 @@ import type { Meters } from '../types/room';
  * | `desk` (Schreibtisch)      | Platte, Wange links, Container rechts, Sichtblende hinten    | Beinraum zwischen Wange und Container                    |
  * | `chair` (Stuhl)            | Unterteil (Beine + Sitz bis Sitzhöhe), Lehne hinten          | Sitz passt unter eine Platte, die Lehne nicht            |
  * | `office-chair` (Bürostuhl) | Unterteil (Fuß, Sitz, Armlehnen), Lehne hinten               | passt unter den Schreibtisch, wenn die Armlehnen passen  |
+ * | `none` (Teppich)           | keine                                                        | liegt unter Möbeln, Türen schwenken darüber              |
+ *
+ * Küchenoberschränke sind `box`, hängen aber erhöht (Standhöhe = Unterkante): Ein Unterschrank
+ * darunter kollidiert nicht, ein Hochschrank oder Kühlschrank daneben schon – reiner Höhenvergleich.
  *
  * Der Couchtisch bleibt ein `box`: Seine Platte liegt so tief (≈ 0,40 m), dass kein Sitz
  * darunter passt – mit Zonen ergäbe sich dasselbe, nur mit mehr Aufwand.
  * Die Maße stammen aus `config/furnitureGeometry.ts` und damit aus denselben Formeln wie die 3D-Modelle.
  */
 
-export type FurnitureCollisionShape = 'box' | 'table' | 'desk' | 'chair' | 'office-chair';
+export type FurnitureCollisionShape = 'box' | 'table' | 'desk' | 'chair' | 'office-chair' | 'none';
 
 export interface FurnitureZone {
   /** Bauteil, z. B. „Platte“, „Bein“, „Lehne“ – für Tests und Fehlersuche. */
@@ -93,6 +97,8 @@ export function furnitureZones(item: Shape): FurnitureZone[] {
         zone('Lehne', -w / 2, w / 2, -d / 2, -d / 2 + g.backDepth, h - g.backH, h),
       ];
     }
+    case 'none':
+      return [];
     default:
       return [envelopeZone(item)];
   }

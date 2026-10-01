@@ -4,13 +4,17 @@ Browserbasierter Raumplaner: Grundriss (Rechteck, L-Form, freie Polygone) in 2D 
 Durchgänge/Raumobjekte an Wände setzen, Möbel und Lampen platzieren, Materialien und Licht gestalten, in 3D
 bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdatei exportieren.
 
-- **Stand:** V1.0.0 + V1.1 Block A („Maße und Grundriss“) + Block B („Möbel realistisch platzieren“).
-  Alle Funktionen fertig und getestet: **1793/1793 Tests in 35 Suiten** grün.
+- **Stand:** **V1.1.0, feature-complete** (App-Version in `package.json`; unabhängig davon Projektformat 7).
+  Alle Funktionen fertig und getestet: **2059/2059 Tests in 39 Suiten** grün.
 - **Repository:** https://github.com/Muecahitbyr/3DRaum.git, Branch `main`.
-- Den aktuellen Stand liefert `git log` (V1.1 Block A: Raumfläche/Umfang, Öffnungsmaßketten,
-  Lagemaße mit Direkteingabe, Durchgang, L-Form-Hauptmaße, Format 6, Unit-Tests; Block B: semantische
-  Kollisionszonen, 3D-Ziehen/-Drehen, gemeinsames Drehen von Auswahl und Gruppe, Gruppennamen,
-  Platzsuche neuer Möbel, Tischlampe auf Trägern).
+- V1.1 besteht aus drei Blöcken (Details: `git log`):
+  - **Block A – Maße und Grundriss:** Raumfläche/Umfang, Öffnungsmaßketten, Lagemaße mit Direkteingabe,
+    Durchgang, L-Form-Hauptmaße, Format 6, Unit-Tests.
+  - **Block B – Möbel realistisch platzieren:** semantische Kollisionszonen, 3D-Ziehen/-Drehen, gemeinsames
+    Drehen von Auswahl und Gruppe, Gruppennamen, Platzsuche neuer Möbel, Tischlampe auf Trägern.
+  - **Block C – Küche, Bad und Datensicherheit:** Küchen- und Badmöbel, Teppich, Pflanze, Wandfliesen,
+    Wandplatzierung, Autosave mit Wiederherstellung, „Speichern unter“, Format 7.
+- Neue Ideen nur dokumentieren (V1.2/V2), nicht auf Verdacht umsetzen.
 - **Sprache:** Oberfläche, Code-Kommentare, Commits und Berichte an den Nutzer auf **Deutsch**.
   Berichte strukturiert und knapp.
 - **Ziel jetzt:** Stabilität und Qualität. Keine Features auf Verdacht und keine Umbauten ohne Anlass.
@@ -48,15 +52,17 @@ src/
   App.tsx                 Komposition: Layout, Sidebar-Panels, Canvas, Dialoge, Export-Ablauf
   main.tsx                Einstieg, globale ErrorBoundary (Fallback „app-error“)
   types/                  Datenmodell: room, opening, fixture, furniture, design, view
-  config/                 Kataloge und Konstanten: furniture (19 Typen), furnitureGeometry (Bauteilmaße für
-                          Modelle und Kollisionszonen), fixtures, openings, design, room, scene, collision
+  config/                 Kataloge und Konstanten: furniture (32 Typen), furnitureGeometry (Bauteilmaße für
+                          Modelle, Plansymbole und Kollisionszonen, inkl. Küche/Spüle/Kochfeld/Wanne),
+                          fixtures, openings, design, room, scene, collision
   state/plannerState.ts   Planungs-Reducer (alle Aktionen, Auswahl, Normalisierung)
   state/history.ts        Undo/Redo-Wrapper mit Transaktionen
   hooks/                  usePlanner, useProjectSession, useCollisionReport,
                           useEditingShortcuts, useHistoryShortcuts, useMediaQuery
   collision/              Collider, semantische Möbelzonen (furnitureZones), Regeln, Erkennung (Broad Phase), Meldungstexte
-  projects/format.ts      Projektformat v5: Parsen, Validieren, Migrationen 1→5
+  projects/format.ts      Projektformat v7: Parsen, Validieren, Migrationen 1→7, `nextVariantName`
   projects/storage.ts     localStorage (ein Schlüssel je Projekt)
+  projects/recovery.ts    Wiederherstellungsentwurf (Autosave): eigener Schlüssel, Prüfen, Relevanz
   export/                 planImage (2D-PNG), pdf (Writer), report (Planungsbericht), files (Download/Import)
   utils/room/             model (RoomModel), plan (Bearbeitung/Validierung, L-Form), containment, dimensions, remap, snap,
                           measurements (Fläche/Umfang, Lagemaße, Maßkette), dimensionLayout (Beschriftung aller Wandmaße)
@@ -66,15 +72,15 @@ src/
   components/
     layout/               PlannerLayout (Drawer), Workspace (Toolbars), MenuButton, Fallback, HistoryControls
     sidebar/              Panels: Raum, Öffnungen, Raumobjekte, Möbel, Eigenschaften, Mehrfachauswahl, Gestaltung
-    projects/             ProjectBar, ProjectManager, ProjectsDialog, Save-/ConfirmDialog
+    projects/             ProjectBar, ProjectManager, ProjectsDialog, Save-/Confirm-/RecoveryDialog
     export/ExportDialog   Export-Optionen mit Status/Fehlermeldung
     library/              Möbelbibliothek mit Vorschaubildern (eigener Canvas, frameloop 'never')
     ui/                   Button, Dialog (Fokusfalle), SegmentedControl, Text-/Maß-/Auswahlfelder
     scene/                PlannerCanvas, TopView (2D), PerspectiveView (3D), Licht, Lampen, Capture,
                           annotations/ (Wandmaß, Öffnungsmaßkette, Lagemaße der Auswahl),
                           room/ (Wände, Boden, Decke, Öffnungen inkl. Durchgang, Raumobjekte, Wand-Fade),
-                          furniture/ (Modelle, Planssymbole, Abstandsmaße, Drehgriff 2D, Drehring 3D,
-                          Grundfläche, gemeinsamer Drehgriff),
+                          furniture/ (Modelle inkl. models/Kitchen-, Bath-, DecorModels, Planssymbole,
+                          Abstandsmaße, Drehgriff 2D, Drehring 3D, Grundfläche, gemeinsamer Drehgriff),
                           interaction/ (Drag-Provider, Grundriss-Editor, Auswahlrahmen)
 e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
       unit/*.test.ts (reine Logik; harness.ts, ts-resolve*.mjs)
@@ -163,11 +169,33 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
 
 ## Möbel, Lampen, Raumobjekte
 
-- **Katalog** in `config/furniture.ts`, prozedurale Modelle ohne Asset-Dateien. 19 Typen:
+- **Katalog** in `config/furniture.ts`, prozedurale Modelle ohne Asset-Dateien. 32 Typen:
   - sofa, armchair, coffee-table, tv-board, shelf, bed, double-bed, wardrobe, dresser, nightstand,
     table, chair, sideboard, desk, office-chair
+  - Küche: kitchen-base (60 × 60 × 90), kitchen-sink (80), kitchen-stove („Herd mit Backofen“), kitchen-wall
+    (Oberschrank 60 × 35 × 70), kitchen-tall (Hochschrank 200), fridge (60 × 65 × 200), kitchen-island (180 × 90 × 92)
+  - Bad: toilet (WC), washbasin (Waschtisch, hängend), shower (90 × 90), bathtub (170 × 75)
+  - Einrichtung: rug (Teppich 200 × 140 × 1 cm), plant (Pflanze)
   - Lampen: ceiling-light, pendant-light, floor-lamp, table-lamp
-- Kategorien `living|bedroom|dining|office|lamps`. Die Bibliothek bietet Suche und Filter (`libraryFilter`).
+- Kategorien `living|bedroom|dining|kitchen|bath|office|lamps` (Teppich in Wohn- und Schlafzimmer, Pflanze im
+  Wohnzimmer). Die Bibliothek bietet Suche (Label + `keywords`, ohne Groß-/Kleinschreibung und Umlaute) und Filter
+  (`libraryFilter`).
+- **Küche/Bad/Einrichtung (Block C):**
+  - Korpus auf 10-cm-Sockel, Fronten mit Fugen, Arbeitsplatte mit Überstand (`KITCHEN` in `furnitureGeometry`).
+    Spüle mit Ausschnitt und vertieftem Becken; Armaturen ragen wie in echt über die Höhe hinaus
+    (Spüle, Waschtisch, Wanne). Farbslots: Fronten/Arbeitsplatte, Gehäuse, Keramik/Unterschrank, Topf/Blätter.
+  - **Oberschrank** hängt über das vorhandene `elevation`-Feld (Feld „Montagehöhe“ = Unterkante, Standard
+    1,45 m, 1,00–2,40 m, Oberkante bleibt unter der Decke) – kein neues Höhensystem. Kollidiert höhenabhängig
+    (nicht mit Unterschränken, wohl mit Hoch-/Kühlschrank). Katalog `wallMounted`: Grundriss gestrichelt mit
+    durchsichtiger Fläche, im PNG über den Unterschränken. Kein Träger für Tischlampen.
+  - **Wandplatzierung** (`placement: 'wall'`, `findFreePlacement`): neue Küchen-/Badmöbel stehen mit der
+    Rückseite an der längsten freien, achsparallelen Wand (Drehung zur Wand, Suche von der Wandmitte aus,
+    25-cm-Schritte); sonst wie gehabt `findFreePosition` um die Raummitte. Kücheninsel, Teppich, Pflanze frei.
+  - **Teppich** (`collision: 'none'`): keine Collider (auch nicht im Türschwenk), keine Abstandsmaße, kein
+    Kontaktschatten; liegt unter Möbeln (Möbel stehen weiter bei y = 0). 2D eine Ebene tiefer
+    (Fläche 0,004/Linien 0,006 statt 0,012/0,016, dezente Linienfarbe `planRugLine`), im PNG zuerst und ohne
+    Beschriftung gezeichnet, im PDF aufgeführt. Höhe 0,5–3 cm.
+  - **Pflanze:** Topf, Erde, Stiel, 13 schräge Blätter (feste Liste); Krone füllt die Grundfläche weitgehend.
 - **`FurnitureItem`:** `{ id, type, name, width, depth, height, position (Plan), rotationDeg, colors?,
   light?, elevation? }`.
   - Farbslots `main|wood|fabric` laut Katalog (`colorSlots`).
@@ -188,9 +216,9 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - **Gemeinsames Drehen** (Auswahl, Gruppe): Griff über dem Auswahlrahmen (2D) bzw. Ring (3D) und
     Schaltflächen ±90°. `rotateFormation` dreht um die Auswahlmitte (Positionen und Eigendrehung),
     hält alles in der Raumkontur (Formation verschieben) oder lehnt den Winkel ab. Eine Geste = ein Schritt.
-  - **Neue Möbel** (`findFreePosition`): deterministische Platzsuche auf 25-cm-Raster um die Raummitte
-    (max. 600 Plätze), erster Platz ohne Kollision (Möbel, Wände, Türschwenk, Fenster, Heizkörper);
-    sonst Raummitte mit Warnung.
+  - **Neue Möbel** (`findFreePlacement` → Wandplatzierung bzw. `findFreePosition`): deterministische
+    Platzsuche auf 25-cm-Raster um die Raummitte (max. 600 Plätze), erster Platz ohne Kollision (Möbel, Wände,
+    Türschwenk, Fenster, Heizkörper); sonst Raummitte mit Warnung.
   - Duplizieren Strg/⌘+D, Kopieren/Einfügen (Versatz 0,2 m), Entf/Backspace löscht.
   - Pfeiltasten verschieben, Ausrichten an Wänden bzw. Raummitte (`AlignmentTools`).
   - Drehgriff im Grundriss, Einrasten an Wänden und Möbeln (`computeFurnitureMove`).
@@ -221,6 +249,8 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   | `desk` | Platte, Wange, Container, Sichtblende | Beinraum zwischen Wange und Container |
   | `chair` | Unterteil bis Sitzhöhe, Lehne | Sitz passt unter die Platte, die Lehne nicht |
   | `office-chair` | Unterteil bis Armlehnen-Oberkante, Lehne | passt, wenn die Armlehnen passen |
+  | `none` (Teppich) | keine | kollidiert mit nichts |
+  Oberschränke sind `box` mit ihrem Höhenbereich ab `elevation`.
   Maße aus `config/furnitureGeometry.ts` (dieselben Formeln wie die 3D-Modelle). Zusätzlich eine Hülle
   (`furnitureEnvelope`) nur für die Heizkörper-Regel. Broad Phase (Sortieren/Fegen), ein Treffer je
   Möbelpaar (auch bei symmetrischen Regeln), Collider je Möbel zwischengespeichert (WeakMap).
@@ -267,17 +297,18 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   herringbone, tiles-large-light/-dark, carpet-light/-dark. Die ersten fünf stammen aus Altprojekten und bleiben gültig.
 - Texturen werden **prozedural und synchron aus Canvas** erzeugt und pro Material gecacht
   (`materials/floorTextures.ts`, `wallTextures.ts`). Es gibt kein asynchrones Laden.
-- Wände: Farbe je Wand-ID (`wallColors`) und Oberfläche `matte|plaster|concrete` (`wallFinishes`),
-  beides auch für alle Wände gleichzeitig. Deckenfarbe `ceilingColor`.
+- Wände: Farbe je Wand-ID (`wallColors`) und Oberfläche `matte|plaster|concrete|tiles` (`wallFinishes`),
+  beides auch für alle Wände gleichzeitig. „Fliesen“ (Block C): 4 × 4 Fliesen mit Fugen je Kachel (0,8 m),
+  Farbe aus der Wandfarbe, Rauigkeit 0,35. Deckenfarbe `ceilingColor`.
 - **Licht:**
   - `lighting { preset: daylight|warm|neutral|cool, brightness 0,4–1,6 }`: Hemisphere-Licht plus ein
     Directional Light mit Schatten (Schattenkamera eng um den Raum).
   - `LEGACY_LIGHTING` (neutral, 1) entspricht exakt der alten festen Beleuchtung.
   - Kontaktschatten unter Möbeln (`ContactShadow`, eigene Ebene).
 
-## Projektformat (Version 6), Speicherung, Migration
+## Projektformat (Version 7), Speicherung, Migration
 
-- Datei/JSON: `{ format: 'raumplaner-project', version: 6, id, name, createdAt, updatedAt, plan }`.
+- Datei/JSON: `{ format: 'raumplaner-project', version: 7, id, name, createdAt, updatedAt, plan }`.
   `plan` enthält `{ room: {shape, height, walls}, openings, furniture, fixtures, groups, design }`.
   `origin` wird nicht gespeichert; beim Laden wird normalisiert.
 - `parseProject` validiert alles und gibt verständliche deutsche Fehler aus: kein JSON, fremdes Format,
@@ -292,8 +323,10 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - 4→5: `wallFinishes {}`, Decke weiß, Licht `LEGACY_LIGHTING`.
   - 5→6: keine Datenänderung (neue Öffnungsart Durchgang). V1.1-Projekte sind nicht rückwärtskompatibel
     (V1.0 lehnt Version 6 als „neuere Version“ ab).
+  - 6→7: keine Datenänderung (neue Möbeltypen Küche/Bad/Teppich/Pflanze, Wandoberfläche „Fliesen“).
+    Ältere Versionen lehnen Version 7 als „neuere Version“ ab, statt unbekannte Typen still zu verwerfen.
   - Alle Versionen ergeben geometrisch identische Szenen; die Suite „migrations“ prüft das.
-    Beim Speichern wird auf Version 6 gehoben.
+    Beim Speichern wird auf Version 7 gehoben.
 - **Neue Formatversion nötig?** Dann `PROJECT_FORMAT_VERSION` erhöhen, Migration ergänzen und
   Tests in `migrations.mjs` erweitern.
 - **localStorage:** Schlüssel `raumplaner:project:<id>`, je Projekt einzeln. Beschädigte Einträge
@@ -302,6 +335,24 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - `beforeunload` warnt bei ungespeicherten Änderungen.
 - Start: immer ein neues Standardprojekt (Rechteck 5 × 4 × 2,5 m, „Unbenanntes Projekt“).
   Das erste Speichern fragt nach dem Namen; beim Ersetzen ungespeicherter Änderungen gibt es eine Rückfrage.
+- **Autosave/Wiederherstellung** (`projects/recovery.ts`, `useProjectSession`):
+  - Eigener Schlüssel `raumplaner:recovery` (nie in der Projektliste), Format `raumplaner-recovery`:
+    `{ savedAt, base: {id, updatedAt} | null, project }` – `project` im normalen Projektformat (Name, voller Plan;
+    Migration und „neuere Version“ über `parseProject`).
+  - Geschrieben wird nur bei ungespeicherten Änderungen, **800 ms nach der letzten Änderung**
+    (`AUTOSAVE_DELAY_MS`), nie während einer Geste (`history.busy`), nie vor der Entscheidung über einen alten
+    Entwurf. Ist der Plan wieder gleich dem gespeicherten Stand, wird der Entwurf entfernt; Speichern entfernt ihn.
+  - Start: Ein relevanter Entwurf (neuer als die letzte Speicherung des Basisprojekts und anders als dieses; bei
+    nie gespeicherten Projekten anders als der Standardplan) erzeugt den Dialog „Nicht gespeicherte Änderungen
+    wiederherstellen?“ mit Name und Zeit (nicht wegklickbar: `Dialog dismissible={false}`).
+    **Wiederherstellen** lädt den Entwurf, das Projekt bleibt ungespeichert (gegenüber dem Basisprojekt bzw. als
+    neues Projekt); **Verwerfen** entfernt ihn und öffnet ggf. den gespeicherten Stand.
+  - Beschädigte oder zukünftige Entwürfe werden mit Hinweis entfernt, veraltete still. Schreibfehler (voll,
+    gesperrt): einmal Hinweis „Automatische Sicherung nicht möglich …“, danach **keine Wiederholungen** bis zum
+    nächsten erfolgreichen Speichern; Export als Projektdatei bleibt möglich. Der Entwurf landet in keinem Export.
+- **„Speichern unter …“** (Projekte-Dialog, Strg/⌘+Umschalt+S): aktueller Stand als neues Projekt (neue ID,
+  eigene Zeitstempel, Namensvorschlag „… Variante n“); das Original bleibt unverändert, weitergearbeitet wird im
+  neuen Projekt, der Verlauf bleibt erhalten, ein späterer Entwurf verweist auf das neue Projekt.
 
 ## Export und Import (Dialog „Export“)
 
@@ -311,6 +362,8 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - Inhalt: Wände, Türbögen, Fenster, Durchgänge, Raumobjekte, beschriftete Möbel (Lampen über Möbeln werden
     darunter beschriftet), Wandmaße, Öffnungsmaßketten; Fußzeile unter dem Plan mit Maßstab und
     Grundfläche/Umfang (schmale Pläne: zweite Zeile).
+  - Reihenfolge: Boden → Teppiche (unbeschriftet, unter Türbögen) → Wände/Öffnungen → Möbel → Oberschränke
+    (gestrichelt, ohne Füllung) → Lampen.
 - **3D-PNG:** `SceneCapture` rendert einmal mit erhöhter Pixeldichte und kopiert sofort, ohne
   `preserveDrawingBuffer`. Hilfselemente (Umrandungen, Einrastlinien, Auswahlrahmen) werden dabei ausgeblendet.
   - Ist die Vorschau nicht offen, schaltet `capturePreview()` kurz in die Vorschau und stellt Ansicht und
@@ -349,7 +402,9 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
 
 ## Accessibility
 
-- `Dialog`: `role="dialog"`, `aria-modal`, `aria-labelledby`.
+- `Dialog`: `role="dialog"`, `aria-modal`, `aria-labelledby`. Das Hintergrund-Grid hat eine Zeile in
+  Bildschirmhöhe (`grid-template-rows: minmax(0, 1fr)`) – sonst wächst sie mit langem Inhalt (z. B. Bibliothek
+  auf dem Smartphone) und der Dialog rutscht aus dem Bild. `dismissible={false}` nur für Entscheidungen.
   - Anfangsfokus: `data-autofocus`, sonst das erste sichtbare Feld.
   - **Fokusfalle** für Tab/Shift+Tab; Escape schließt nur den obersten Dialog; danach geht der Fokus
     an den Auslöser zurück.
@@ -402,6 +457,9 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   ≈ 3, Drehen ≈ 3, Gruppendrehen ≈ 4 Commits je Bewegung, danach 0 Commits und 0 Frames; Kollisionsbericht
   bei einem bewegten Möbel < 1 ms.
 - `RoomDimensionLines` ist `memo`: Jedes Maß-Etikett ist ein eigenes HTML-Overlay mit eigener React-Wurzel.
+- **Autosave** schreibt aus einem Zeitgeber ohne State-Änderung (keine React-Commits, keine Frames), nie
+  während einer Geste und nicht je Zeigerereignis: die Suite „performance“ prüft mit 150 gemischten
+  Küchen-/Bad-Objekten 0 Schreibvorgänge beim Ziehen/Drehen, genau einen danach und anschließend Ruhe.
 
 ## Wichtige Entscheidungen und bekannte Grenzen
 
@@ -420,6 +478,11 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - In 3D wird nur ein bereits ausgewähltes Möbel gezogen (erst antippen/klicken, dann ziehen).
   - Gemeinsames Drehen lehnt Winkel ab, in denen die Formation nicht in den Raum passt.
   - Ohne WebGL keine 3D-Ansicht.
+  - Block C: Oberschrank-Montagehöhe frei (1,00–2,40 m), keine automatische Ausrichtung an Unterschränken;
+    Wandplatzierung nur an achsparallelen Wänden (schräge Wände: Platzsuche um die Raummitte); kein Badschrank,
+    keine Eckschränke/Geräte-Einbauten; Armaturen ragen über die angegebene Höhe hinaus. Autosave hält genau
+    einen Entwurf (zuletzt bearbeitetes Projekt); zwei Tabs teilen sich diesen Entwurf.
+  - Konsolenhinweis „THREE.Clock … deprecated“ stammt aus R3F 9 selbst (nicht behebbar ohne Bibliotheks-Update).
   - Die E2E-Tests laufen mit Software-WebGL (SwiftShader), deshalb sind die Bildraten-Grenzwerte großzügig
     bzw. relativ zu einer Grundlinie im selben Lauf.
   - `dist/` ist lokal vorhanden, aber ignoriert.
@@ -428,7 +491,7 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
 
 - **Befehle:**
   - `npm test`: Production-Build inklusive `tsc -b`, danach Unit-Test und alle Browser-Suiten.
-    Dauert etwa 25 Minuten, daher im Hintergrund starten und das Log lesen.
+    Dauert etwa 30 Minuten, daher im Hintergrund starten und das Log lesen.
   - `npm test -- mobile export`: nur Suiten, deren Dateiname passt.
   - `--no-build` nutzt das vorhandene `dist/`; `--verbose` zeigt alle Einzelprüfungen.
 - **Runner** `e2e/run.mjs`:
@@ -443,21 +506,25 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   laufenden Testlaufs keine Dateien in `src/` ändern**: HMR verfälscht die Ergebnisse.
 - **Hilfen:**
   - `e2e/lib/scenes.mjs`: Testprojekte (livingRoom, bedroom, lRoom, freeRoom, office; Block B: diningArea,
-    officeDesk, livingCollision), `project()`,
+    officeDesk, livingCollision; Block C: kitchenScene, bathScene, livingRug), `project()`,
     `item()`, `openScene()`.
   - `e2e/lib/planner.mjs`: `addFurniture`.
   - `e2e/lib/images.mjs`: `analyzeImage`, `exportFile`.
-- **Suiten (35):**
+- **Suiten (39):**
   - Unit: Kollisionsgeometrie, Raummaße & Maßketten, L-Form, Öffnungen/Durchgang/Format 6,
-    Kollisionszonen & Höhen, Platzierung/Drehen/Gruppen/Tischlampen
+    Kollisionszonen & Höhen, Platzierung/Drehen/Gruppen/Tischlampen, **Küche/Bad/Teppich & Format 7**,
+    **Autosave/Recovery & Speichern unter**
   - Grundlagen: Raumgeometrie, Raum 2D/3D (Preview-Build)
   - Öffnungen: Türen & Fenster, Drag & Drop Türen/Fenster, **Maße, Durchgang & L-Form**
   - Möbel: Möbel, Drag & Drop Möbel, Möbelbibliothek, Abstandsmaße, Bearbeiten/Mehrfachauswahl/Gruppen,
     **Möbel realistisch platzieren** (Essbereich/Büro/Wohnzimmer, 3D ziehen/drehen, Touch 375–768 px)
   - Szene: Kollisionen, Kameraabhängige Wände, Raumobjekte, Freie Raumformen & Grundriss-Editor
-  - Gestaltung: Gestaltung, Gestaltung/Decke/Licht/Vorschau, Lampen & Möbelfarben, Visuelle Szenen
-  - Verlauf und Projekte: Undo/Redo, Lokale Projekte, Speicherkompatibilität (Format 1–6)
-  - Performance: Performance, **Rendern auf Anforderung**
+  - Gestaltung: Gestaltung, Gestaltung/Decke/Licht/Vorschau, Lampen & Möbelfarben,
+    **Küche, Bad, Teppich & Pflanze** (Bibliothek, Einfügen, Oberschrank, Bearbeiten, Export, 390 px),
+    Visuelle Szenen
+  - Verlauf und Projekte: Undo/Redo, Lokale Projekte, **Autosave, Wiederherstellung & Speichern unter**
+    (Szenarien 1–10 inkl. Speicher voll), Speicherkompatibilität (Format 1–7)
+  - Performance: Performance (inkl. 150 gemischte Küchen-/Bad-Objekte + 10 Lampen), **Rendern auf Anforderung**
   - V1-Abnahme: Export, Mobile/Tablet/Touch, Fehlerbehandlung & Robustheit, Accessibility,
     Visuelle Endabnahme (5 Projekte × 3 Geräte)
-- **Aktueller Stand:** **1793/1793 Tests in 35 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.
+- **Aktueller Stand:** **2059/2059 Tests in 39 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.

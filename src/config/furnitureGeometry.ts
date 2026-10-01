@@ -63,3 +63,40 @@ export function officeChairGeometry(h: Meters) {
     backDepth: 0.07,
   };
 }
+
+/**
+ * Küchenmöbel: gemeinsame Bauteilmaße für Modelle und Plansymbole. Korpus auf Sockel,
+ * Fronten mit Fugen, Arbeitsplatte mit kleinem Überstand nach vorn.
+ */
+export const KITCHEN = {
+  plinth: 0.1,
+  /** Rücksprung des Sockels hinter die Front. */
+  plinthSetback: 0.05,
+  worktop: 0.04,
+  front: 0.018,
+  handle: 0.012,
+  gap: 0.004,
+  /** Kücheninsel: Überstand der Arbeitsplatte auf der Sitzseite (−z). */
+  islandOverhang: 0.25,
+} as const;
+
+/** Spüle: Becken (Breite/Tiefe) und Lage auf der Arbeitsplatte. */
+export function sinkGeometry(w: Meters, d: Meters) {
+  const basinW = Math.min(0.5, w - 0.2);
+  const basinD = Math.min(0.4, d - 0.18);
+  return { basinW, basinD, basinZ: 0.02, tapZ: -d / 2 + 0.08 };
+}
+
+/** Kochfeld: vier Kochzonen (Mittelpunkte, Radien) auf der Arbeitsplatte. */
+export function hobGeometry(w: Meters, d: Meters) {
+  const r = Math.min(0.1, w * 0.16);
+  const dx = Math.min(0.14, w / 4);
+  const dz = Math.min(0.13, d / 4);
+  return { r, zones: [[-dx, -dz, r], [dx, -dz, r * 0.8], [-dx, dz, r * 0.8], [dx, dz, r]] as [number, number, number][] };
+}
+
+/** Badewanne: Wannenrand und Innenmulde. */
+export function bathtubGeometry(w: Meters, d: Meters) {
+  const rim = Math.min(0.08, d * 0.12);
+  return { rim, innerW: w - 2 * rim, innerD: d - 2 * rim };
+}

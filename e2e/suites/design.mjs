@@ -156,7 +156,7 @@ await page.getByTestId('project-save').click(); await settle();
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').fill('Farbig');
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').press('Enter'); await settle(200);
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
-check('Gespeichert in aktueller Formatversion (6) mit Gestaltung', stored.version === 6 && stored.plan.design?.floor === 'wood-dark' && stored.plan.design.wallColors.west === '#4b5057', JSON.stringify(stored.plan.design));
+check('Gespeichert in aktueller Formatversion (7) mit Gestaltung', stored.version === 7 && stored.plan.design?.floor === 'wood-dark' && stored.plan.design.wallColors.west === '#4b5057', JSON.stringify(stored.plan.design));
 await page.reload(); await ready();
 check('Nach Neuladen: Standardgestaltung', (await sceneDesign()).floor.id === 'wood-light');
 await page.getByTestId('projects-button').click(); await settle();
@@ -191,7 +191,7 @@ check('Version 1: unverändert geöffnet gilt als gespeichert', (await page.getB
 await design.getByTestId('floor-option-concrete').click(); await settle();
 await page.mouse.click(1390, 880); await page.keyboard.press('Control+s'); await settle(200);
 const migrated = await page.evaluate(() => JSON.parse(localStorage.getItem('raumplaner:project:alt-v1')));
-check('Beim Speichern auf aktuelle Version (6) aktualisiert (inkl. Gestaltung)', migrated.version === 6 && migrated.plan.design.floor === 'concrete' && migrated.plan.furniture[0].name === 'Altes Sofa');
+check('Beim Speichern auf aktuelle Version (7) aktualisiert (inkl. Gestaltung)', migrated.version === 7 && migrated.plan.design.floor === 'concrete' && migrated.plan.furniture[0].name === 'Altes Sofa');
 await page.getByTestId('projects-button').click(); await settle();
 await page.getByTestId('project-item').filter({ hasText: 'Kaputte Gestaltung' }).getByTestId('project-open').click(); await settle(500);
 d = await sceneDesign();

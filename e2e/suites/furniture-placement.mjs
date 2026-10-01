@@ -221,7 +221,7 @@ await view('3D');
 check('3D: gemeinsamer Drehring für die Gruppe', (await page.getByTestId('formation-rotation-handle').count()) === 1 && (await helpers()).footprint === 7);
 await page.getByTestId('project-save').click(); await settle(400);
 const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('raumplaner:project:essbereich')));
-check('Gespeichert: Gruppenname, Format 6', stored.version === 6 && stored.plan.groups[0].name === 'Essgruppe' && stored.plan.groups[0].memberIds.length === 7);
+check('Gespeichert: Gruppenname, Format 7', stored.version === 7 && stored.plan.groups[0].name === 'Essgruppe' && stored.plan.groups[0].memberIds.length === 7);
 
 // ---------- 7. Platzsuche neuer Möbel
 await openScene(page, { ...project('leer', 'Leer', { walls: rectangleWalls(5, 4, 2.5) }), version: 6 });

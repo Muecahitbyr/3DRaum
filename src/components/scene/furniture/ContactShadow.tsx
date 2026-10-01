@@ -28,7 +28,8 @@ const noRaycast = () => {};
  */
 export function ContactShadow({ width, depth, opacity = 0.32 }: { width: number; depth: number; opacity?: number }) {
   return (
-    <mesh name="contact-shadow" position-y={0.007} rotation-x={-Math.PI / 2} raycast={noRaycast} renderOrder={-1}>
+    // 12 mm über dem Boden: auch auf einem Teppich (max. 10 mm hoch) sichtbar.
+    <mesh name="contact-shadow" position-y={0.012} rotation-x={-Math.PI / 2} raycast={noRaycast} renderOrder={-1}>
       <planeGeometry args={[width * 1.35 + 0.12, depth * 1.35 + 0.12]} />
       <meshBasicMaterial map={shadowTexture()} color="#000000" transparent opacity={opacity} depthWrite={false} />
     </mesh>

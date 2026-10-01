@@ -1,5 +1,5 @@
 import { rectanglePolygon } from '../collision/geometry';
-import { isLamp } from '../config/furniture';
+import { FURNITURE_CATALOG, isLamp } from '../config/furniture';
 import type { RoomFixture } from '../types/fixture';
 import type { FurnitureItem } from '../types/furniture';
 import type { Opening } from '../types/opening';
@@ -42,6 +42,7 @@ const COLORS = {
   dimension: '#5b6472',
   text: '#1b1f27',
   opening: '#ffffff',
+  rugLine: '#b3aa9b',
 } as const;
 
 /** Rand um den Raum (m) – Platz für Maßketten. */
@@ -105,6 +106,10 @@ export function renderPlanImage(input: PlanImageInput, options: PlanImageOptions
   ctx.fillStyle = COLORS.floor;
   ctx.fill();
 
+  // Teppiche direkt auf dem Boden: Türbögen und alle Möbel liegen darüber (wie im Grundriss).
+  const rugs = input.furniture.filter((item) => item.type === 'rug');
+  for (const rug of rugs) drawFurniture(ctx, rug, P, px);
+
   // Wände (Gehrungsvierecke)
   for (const wall of room.walls) {
     path(ctx, wallQuad(wall).map(P), true);
@@ -124,8 +129,9 @@ export function renderPlanImage(input: PlanImageInput, options: PlanImageOptions
     if (wall) drawFixture(ctx, wall, fixture, P, px);
   }
 
-  // Möbel (Deckenleuchten zuletzt, damit sie oben liegen)
-  const ordered = [...input.furniture].sort((a, b) => Number(a.type.includes('light')) - Number(b.type.includes('light')));
+  // Möbel: zuerst stehende Möbel, dann Oberschränke, Deckenleuchten zuletzt (darüber).
+  const layer = (item: FurnitureItem) => (item.type.includes('light') ? 2 : FURNITURE_CATALOG[item.type].wallMounted ? 1 : 0);
+  const ordered = input.furniture.filter((item) => item.type !== 'rug').sort((a, b) => layer(a) - layer(b));
   for (const item of ordered) drawFurniture(ctx, item, P, px);
   if (labels) {
     // Lampe über einem Möbel (Pendel über dem Esstisch, Tischlampe): Beschriftung unter
@@ -135,6 +141,7 @@ export function renderPlanImage(input: PlanImageInput, options: PlanImageOptions
       input.furniture.some(
         (other) => other !== item && !isLamp(other.type) && pointInPolygon(item.position, rectanglePolygon(other.position, other.width / 2, other.depth / 2, other.rotationDeg)),
       );
+    // Teppiche ohne Beschriftung (liegen unter Möbeln; im PDF-Bericht aufgeführt).
     for (const item of ordered) drawLabel(ctx, item, P, px, below(item));
   }
 
@@ -320,15 +327,24 @@ function tint(item: FurnitureItem): string {
 }
 
 function drawFurniture(ctx: Ctx, item: FurnitureItem, P: (p: FloorPoint) => [number, number], px: (m: number) => number) {
+  const rug = item.type === 'rug';
+  const line = rug ? COLORS.rugLine : COLORS.furnitureLine;
+  // Oberschränke hängen über der Schnittebene: gestrichelt und ohne Füllung (Unterschränke bleiben sichtbar).
+  const wallMounted = !!FURNITURE_CATALOG[item.type].wallMounted;
+  ctx.save();
+  if (wallMounted) ctx.setLineDash([px(0.06), px(0.04)]);
   const outline = furniturePlanOutline(item).map((p) => P(furniturePoint(item, p)));
   path(ctx, outline, true);
-  ctx.fillStyle = tint(item);
-  ctx.fill();
-  stroke(ctx, COLORS.furnitureLine, Math.max(1.5, px(0.012)));
-  for (const line of furniturePlanDetails(item.type, item)) {
-    path(ctx, line.map((p) => P(furniturePoint(item, p))), false);
-    stroke(ctx, COLORS.furnitureLine, Math.max(1, px(0.008)));
+  if (!wallMounted) {
+    ctx.fillStyle = tint(item);
+    ctx.fill();
   }
+  stroke(ctx, line, Math.max(1.5, px(0.012)));
+  for (const detail of furniturePlanDetails(item.type, item)) {
+    path(ctx, detail.map((p) => P(furniturePoint(item, p))), false);
+    stroke(ctx, line, Math.max(1, px(0.008)));
+  }
+  ctx.restore();
 }
 
 function drawLabel(ctx: Ctx, item: FurnitureItem, P: (p: FloorPoint) => [number, number], px: (m: number) => number, below = false) {

@@ -345,6 +345,108 @@ async function measureFrames() {
   check(`150 Möbel: Kollisionsbericht bei einem bewegten Möbel < 10 ms (${timing.toFixed(2)} ms)`, timing < 10);
 }
 
+// 7. Block C: 150 gemischte Objekte (Küche, Bad, Teppiche, Pflanzen, Möbel) + 10 Lampen –
+//    Vorschau, 2D ziehen, 3D drehen; Commits nur bei Bewegung, kein Autosave-Schreiben während
+//    der Geste, danach Ruhe (0 Commits, 0 Frames – auch nach Ablauf der Autosave-Ruhezeit).
+{
+  const kinds = [
+    ['kitchen-base', [0.6, 0.6, 0.9]], ['kitchen-sink', [0.8, 0.6, 0.9]], ['kitchen-stove', [0.6, 0.6, 0.9]], ['kitchen-wall', [0.6, 0.35, 0.7], { elevation: 1.45 }],
+    ['kitchen-tall', [0.6, 0.6, 2]], ['fridge', [0.6, 0.65, 2]], ['toilet', [0.4, 0.7, 0.8]], ['washbasin', [0.8, 0.5, 0.85]], ['shower', [0.8, 0.8, 2]],
+    ['plant', [0.45, 0.45, 1.2]], ['rug', [0.8, 0.6, 0.01]], ['chair', [0.45, 0.52, 0.9]],
+  ];
+  const furniture = [];
+  for (let i = 0; i < 150; i++) {
+    const [type, size, extra = {}] = kinds[i % kinds.length];
+    furniture.push(item(type, `Objekt ${i + 1}`, 0.6 + (i % 15) * 0.95, 0.6 + Math.floor(i / 15) * 0.95, (i % 4) * 90, size, extra));
+  }
+  for (let i = 0; i < 10; i++) {
+    furniture.push(item(['ceiling-light', 'pendant-light'][i % 2], `Lampe ${i + 1}`, 1 + i * 1.4, 9.7, 0, i % 2 ? [0.4, 0.4, 0.8] : [0.45, 0.45, 0.12], { light: { on: true, intensity: 1, temperature: 3000 } }));
+  }
+  await openScene(page, { ...project('perf-kueche-bad', 'Block C 150', { walls: rectangleWalls(15, 10), furniture, design: { wallFinishes: { north: 'tiles', east: 'tiles' } } }), version: 7 });
+  await page.getByRole('button', { name: '3D', exact: true }).click(); await settle(1200);
+  const counts = await page.evaluate(() => {
+    let furniture = 0, lights = 0;
+    window.__PLANNER_R3F__().scene.traverse((o) => { if (o.userData?.furnitureId) furniture++; if (o.name === 'lamp-light') lights++; });
+    return { furniture, lights };
+  });
+  check('Block C: 160 Objekte (Küche, Bad, Teppich, Pflanze, Lampen) geladen, 8 Lichtquellen', counts.furniture === 160 && counts.lights === 8, JSON.stringify(counts));
+  const held = () => page.evaluate(async () => { const s = window.__commits; await new Promise((r) => setTimeout(r, 800)); return window.__commits - s; });
+  const framesIdle = () => page.evaluate(async () => { const s = window.__PLANNER_R3F__(); const f0 = s.gl.info.render.frame; await new Promise((r) => setTimeout(r, 1500)); return s.gl.info.render.frame - f0; });
+  const commitsDuring = async (action) => page.evaluate(() => window.__commits).then(async (c0) => { await action(); return (await page.evaluate(() => window.__commits)) - c0; });
+  const screen = (id, y) => page.evaluate(({ id, y }) => {
+    const s = window.__PLANNER_R3F__();
+    const v = s.scene.getObjectByName(id).getWorldPosition(s.camera.position.clone()).setY(y).project(s.camera);
+    const r = s.gl.domElement.getBoundingClientRect();
+    return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+  }, { id, y });
+  // Autosave-Schreibvorgänge mitzählen (Zeitpunkte)
+  await page.evaluate(() => {
+    window.__recoveryWrites = [];
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) { if (key === 'raumplaner:recovery') window.__recoveryWrites.push(performance.now()); return setItem.call(this, key, value); };
+  });
+  const writes = () => page.evaluate(() => window.__recoveryWrites.length);
+
+  await page.getByTestId('view-3d-mode').getByRole('button', { name: 'Vorschau' }).click(); await settle(1200);
+  const preview = await measureFrames();
+  check('Block C, Vorschau: Frame-Median im Rahmen (Software-Rendering)', preview.median < 400, JSON.stringify(preview));
+  await page.getByTestId('view-3d-mode').getByRole('button', { name: 'Bearbeiten' }).click(); await settle(900);
+
+  // 2D: Spülenschrank ziehen
+  await page.getByRole('button', { name: '2D', exact: true }).click(); await settle(900);
+  const sink = furniture[61];
+  await page.getByTestId('furniture-list-item').filter({ hasText: sink.name }).first().click(); await settle(400);
+  const p = await screen(sink.id, 0.05);
+  const steps = 15;
+  let heldMove = 0, writesDuring = 0;
+  const w0 = await writes();
+  const moveCommits = await commitsDuring(async () => {
+    await page.mouse.move(p.x, p.y); await page.mouse.down();
+    for (let i = 1; i <= steps; i++) await page.mouse.move(p.x + i * 3, p.y + i);
+    await settle(300);
+    heldMove = await held();
+    writesDuring = (await writes()) - w0;
+    await page.mouse.up(); await settle(400);
+  });
+  check(`Block C, 2D ziehen: Commits nur bei Bewegung (gehalten ${heldMove}, ${steps} Bewegungen: ${moveCommits})`, heldMove === 0 && moveCommits / steps < 12, String(moveCommits));
+  check('Block C, 2D ziehen: kein Autosave während der Geste, ein Verlaufsschritt', writesDuring === 0 && (await page.getByTestId('history-undo').getAttribute('title')).startsWith('Möbel verschieben'), String(writesDuring));
+  await settle(1500);
+  check('Block C: nach dem Loslassen genau ein Autosave', (await writes()) - w0 === 1, String((await writes()) - w0));
+
+  // 3D: Kühlschrank am Ring drehen
+  await page.getByRole('button', { name: '3D', exact: true }).click(); await settle(1200);
+  const fridge = furniture[65];
+  await page.getByTestId('furniture-list-item').filter({ hasText: fridge.name }).first().click(); await settle(400);
+  const k = await page.getByTestId('rotation-handle-3d').boundingBox();
+  const c = await screen(fridge.id, 0);
+  const kc = { x: k.x + k.width / 2, y: k.y + k.height / 2 };
+  const w1 = await writes();
+  const rotateCommits = await commitsDuring(async () => {
+    await page.mouse.move(kc.x, kc.y); await page.mouse.down();
+    for (let i = 1; i <= steps; i++) { const t = (i / steps) * (Math.PI / 2); await page.mouse.move(c.x + (kc.x - c.x) * Math.cos(t) - (kc.y - c.y) * Math.sin(t), c.y + (kc.x - c.x) * Math.sin(t) + (kc.y - c.y) * Math.cos(t)); }
+    writesDuring = (await writes()) - w1;
+    await page.mouse.up(); await settle(400);
+  });
+  check(`Block C, 3D drehen: Commits je Bewegung begrenzt (${steps} Bewegungen: ${rotateCommits}), kein Autosave währenddessen`, rotateCommits / steps < 12 && writesDuring === 0, `${rotateCommits} / ${writesDuring}`);
+  await settle(1200); // Autosave-Ruhezeit abwarten
+  const idleCommits = await held();
+  const idleFrames = await framesIdle();
+  const w2 = await writes();
+  await settle(1500);
+  check(`Block C, danach Ruhe (Commits ${idleCommits}, Frames ${idleFrames}, keine weiteren Autosaves)`, idleCommits === 0 && idleFrames === 0 && (await writes()) === w2);
+  const timing = await page.evaluate(async (items) => {
+    const col = await import('/src/collision/index.ts');
+    const m = await import('/src/utils/room/model.ts');
+    const pl = await import('/src/utils/room/plan.ts');
+    const room = m.roomModelOf(pl.createRectangleRoom({ width: 15, length: 10, height: 2.6 }));
+    col.computeCollisionReport(room, [], items);
+    const t0 = performance.now();
+    for (let i = 0; i < 20; i++) col.computeCollisionReport(room, [], items.map((f, j) => (j === 40 ? { ...f, position: { x: f.position.x + i * 0.01, z: f.position.z } } : f)));
+    return (performance.now() - t0) / 20;
+  }, furniture);
+  check(`Block C: Kollisionsbericht (160 gemischte Objekte) < 10 ms (${timing.toFixed(2)} ms)`, timing < 10);
+}
+
 check('Keine Laufzeitfehler', errors.length === 0, errors.join(' | '));
 
 const failed = results.filter((x) => !x.ok).length;

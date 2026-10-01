@@ -4,6 +4,8 @@
   z-index: 100;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* Zeile = Bildschirmhöhe: sonst wächst sie mit langem Inhalt, und der Dialog rutscht aus dem Bild. */
+  grid-template-rows: minmax(0, 1fr);
   place-items: center;
   padding: 16px;
   background: rgba(16, 24, 40, 0.35);

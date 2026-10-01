@@ -74,7 +74,7 @@ check('Gespeichert: Name „Wohnzimmer“, Status „Gespeichert“', s.state ==
 check('Rückmeldung „„Wohnzimmer“ gespeichert.“', (await notice()) === '„Wohnzimmer“ gespeichert.');
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
 check('Gespeichertes Format: versioniert, nur Plan (keine UI-/Kamera-Zustände)',
-  stored.format === 'raumplaner-project' && stored.version === 6 &&
+  stored.format === 'raumplaner-project' && stored.version === 7 &&
   JSON.stringify(Object.keys(stored).sort()) === JSON.stringify(['createdAt', 'format', 'id', 'name', 'plan', 'updatedAt', 'version']) &&
   JSON.stringify(Object.keys(stored.plan).sort()) === JSON.stringify(['design', 'fixtures', 'furniture', 'groups', 'openings', 'room']),
   Object.keys(stored).join(','));

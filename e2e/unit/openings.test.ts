@@ -66,7 +66,7 @@ const rest = readingDistances(diagonal, onDiagonal).end;
 check('Diagonale Wand: Restabstand 25 cm auf 1 cm genau (Lage cm-genau gespeichert)', Math.abs(rest - 0.25) <= 0.005 + 1e-9, rest);
 
 // ---------- Projektformat 6 und Migration
-check('Aktuelle Formatversion 6', PROJECT_FORMAT_VERSION === 6);
+check('Aktuelle Formatversion 7 (Durchgang seit 6)', PROJECT_FORMAT_VERSION === 7);
 const walls = createRectangleRoom({ width: 5, length: 4, height: 2.5 }).walls;
 const plan5 = {
   room: { shape: 'rectangle', height: 2.5, walls },
@@ -82,7 +82,7 @@ const plan5 = {
 const meta = (version: number) => ({ format: 'raumplaner-project', version, id: `v${version}`, name: `V${version}`, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' });
 const v5 = parseProject(JSON.stringify({ ...meta(5), plan: plan5 }));
 const v6 = parseProject(JSON.stringify({ ...meta(6), plan: plan5 }));
-check('Version 5 lesbar, ohne Warnungen, auf 6 gehoben', v5.ok && v5.project.version === 6 && v5.warnings.length === 0, v5);
+check('Version 5 lesbar, ohne Warnungen, auf die aktuelle Version gehoben', v5.ok && v5.project.version === PROJECT_FORMAT_VERSION && v5.warnings.length === 0, v5);
 check('Version 5 → 6: Plan identisch (Türen, Fenster, Geometrie, Möbel)', v5.ok && v6.ok && JSON.stringify(v5.project.plan) === JSON.stringify(v6.project.plan));
 const withPassage = { ...plan5, openings: [...plan5.openings, { id: 'opening-3', type: 'passage', wall: 'east', offset: 1.5, width: 1.1, height: 2.05 }] };
 const parsed = parseProject(JSON.stringify({ ...meta(6), plan: withPassage }));
@@ -95,7 +95,7 @@ const broken = parseProject(JSON.stringify({ ...meta(6), plan: { ...plan5, openi
 check('Durchgang an unbekannter Wand: übersprungen mit Warnung', broken.ok && broken.project.plan.openings.length === 0 && broken.warnings.length === 1);
 const legacyPassage = parseProject(JSON.stringify({ ...meta(5), plan: withPassage }));
 check('Version 5 mit fremdem Öffnungstyp bleibt robust lesbar', legacyPassage.ok);
-const future = parseProject(JSON.stringify({ ...meta(7), plan: plan5 }));
-check('Version 7: verständliche Ablehnung (neuere Version)', !future.ok && future.error.includes('neueren Version'));
+const future = parseProject(JSON.stringify({ ...meta(PROJECT_FORMAT_VERSION + 1), plan: plan5 }));
+check('Version aus der Zukunft (aktuelle + 1): verständliche Ablehnung (neuere Version)', !future.ok && future.error.includes('neueren Version'));
 
 done();

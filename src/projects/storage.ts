@@ -23,9 +23,10 @@ export interface ProjectSummary {
 
 export type StorageResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
-const STORAGE_UNAVAILABLE = 'Der lokale Speicher des Browsers ist nicht verfügbar.';
+export const STORAGE_UNAVAILABLE = 'Der lokale Speicher des Browsers ist nicht verfügbar.';
 
-function storage(): Storage | null {
+/** Zugriff auf localStorage (`null`, wenn gesperrt oder nicht vorhanden). */
+export function storage(): Storage | null {
   try {
     return window.localStorage;
   } catch {
@@ -33,7 +34,8 @@ function storage(): Storage | null {
   }
 }
 
-function describeStorageError(error: unknown): string {
+/** Verständlicher Fehlertext für Schreibfehler (Speicher voll, gesperrt …). */
+export function describeStorageError(error: unknown): string {
   if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.code === 22)) {
     return 'Der lokale Speicher ist voll. Bitte nicht mehr benötigte Projekte löschen.';
   }

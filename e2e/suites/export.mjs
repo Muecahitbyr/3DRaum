@@ -101,7 +101,7 @@ check('PDF-Export ändert die Ansicht nicht', (await page.getByTestId('view-3d-m
 await openExport();
 const file = await exportFile(page, 'export-project');
 const json = JSON.parse(fs.readFileSync(file.path, 'utf8'));
-check('Projektdatei: .3draum, versioniert, vollständiger Plan', file.name === 'Wohnzimmer daylight.3draum' && json.format === 'raumplaner-project' && json.version === 6 && json.plan.furniture.length === 7 && json.plan.openings.length === 3 && json.plan.fixtures.length === 1 && json.plan.room.walls.length === 4 && !('origin' in json.plan.room), file.name);
+check('Projektdatei: .3draum, versioniert, vollständiger Plan', file.name === 'Wohnzimmer daylight.3draum' && json.format === 'raumplaner-project' && json.version === 7 && json.plan.furniture.length === 7 && json.plan.openings.length === 3 && json.plan.fixtures.length === 1 && json.plan.room.walls.length === 4 && !('origin' in json.plan.room), file.name);
 await closeDialog();
 const storedBefore = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('raumplaner:project:')).length);
 // Datei für ein „anderes Gerät“: Namen ändern
@@ -160,6 +160,9 @@ await closeDialog();
 
 // ---------- 6. Freie Form: Grundriss-Export mit schräger Wand
 await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
+// V1.1: Die Änderung „Geändert“ ist ungespeichert → Wiederherstellungsangebot; hier bewusst verwerfen.
+check('Neu laden mit ungespeicherten Änderungen: Wiederherstellungsangebot', (await page.getByTestId('recovery-dialog').count()) === 1);
+await page.getByTestId('recovery-discard').click(); await settle(400);
 await openScene(page, freeRoom());
 await openExport();
 const freePng = await exportFile(page, 'export-plan-png');

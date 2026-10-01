@@ -195,7 +195,7 @@ await page.getByTestId('project-save').click(); await settle();
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').fill('Maße A');
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').press('Enter'); await settle(300);
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
-check('Gespeichert (Version 6) mit Durchgang', stored.version === 6 && stored.plan.openings.some((o) => o.type === 'passage' && o.wall === 'east' && o.offset === 0.6 && o.width === 1));
+check('Gespeichert (Version 7) mit Durchgang', stored.version === 7 && stored.plan.openings.some((o) => o.type === 'passage' && o.wall === 'east' && o.offset === 0.6 && o.width === 1));
 await page.getByTestId('opening-list-item').filter({ hasText: 'Tür 1' }).click(); await settle();
 await page.evaluate(() => {
   window.__texts = [];
@@ -204,7 +204,7 @@ await page.evaluate(() => {
 });
 await page.getByTestId('export-button').click(); await page.getByTestId('export-dialog').waitFor(); await settle();
 const projectFile = JSON.parse(fs.readFileSync((await exportFile(page, 'export-project')).path, 'utf8'));
-check('Projektdatei: Version 6 mit Durchgang', projectFile.version === 6 && projectFile.plan.openings.some((o) => o.type === 'passage'));
+check('Projektdatei: Version 7 mit Durchgang', projectFile.version === 7 && projectFile.plan.openings.some((o) => o.type === 'passage'));
 const png = await exportFile(page, 'export-plan-png');
 const texts = await page.evaluate(() => window.__texts);
 check('Grundriss-PNG: Öffnungskette Südwand (3,00 · 1,00 · 1,00) und Ostwand (0,60 · 1,00)', ['3,00', '1,00', '0,60'].every((t) => texts.includes(t)), JSON.stringify(texts.filter((t) => /^\d+,\d\d$/.test(t))));

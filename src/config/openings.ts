@@ -36,13 +36,6 @@ export const OPENING_TYPE_LABELS: Record<OpeningType, string> = {
   passage: 'Durchgang',
 };
 
-/** Mehrzahl (Listen, Bericht). */
-export const OPENING_TYPE_PLURALS: Record<OpeningType, string> = {
-  door: 'Türen',
-  window: 'Fenster',
-  passage: 'Durchgänge',
-};
-
 /** Reihenfolge der Hinzufügen-Buttons. */
 export const OPENING_TYPES: readonly OpeningType[] = ['door', 'window', 'passage'];
 

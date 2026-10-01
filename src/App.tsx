@@ -94,7 +94,7 @@ export function App() {
   };
 
   // Lokale Projekte: Öffnen/Neu ersetzt den Plan samt Verlauf und passt die Kamera neu ein.
-  const projectSession = useProjectSession(plan, history.reset);
+  const projectSession = useProjectSession(plan, history.reset, history.busy);
   const [cameraFitToken, setCameraFitToken] = useState(0);
   const handlePlanReplaced = useCallback(() => setCameraFitToken((token) => token + 1), []);
   // Neue Raumform: auch die 3D-Kamera neu einpassen.

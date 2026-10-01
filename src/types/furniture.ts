@@ -23,7 +23,20 @@ export type FurnitureType =
   | 'ceiling-light'
   | 'pendant-light'
   | 'floor-lamp'
-  | 'table-lamp';
+  | 'table-lamp'
+  | 'kitchen-base'
+  | 'kitchen-wall'
+  | 'kitchen-tall'
+  | 'kitchen-sink'
+  | 'kitchen-stove'
+  | 'fridge'
+  | 'kitchen-island'
+  | 'toilet'
+  | 'washbasin'
+  | 'shower'
+  | 'bathtub'
+  | 'rug'
+  | 'plant';
 
 /** Einstellbare Farbbereiche eines Möbels (nicht jedes Bauteil einzeln). */
 export type FurnitureColorSlot = 'main' | 'wood' | 'fabric';

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ProjectSession } from '../../hooks/useProjectSession';
 import { readProjectFile } from '../../export/files';
-import { cleanProjectName, DEFAULT_PROJECT_NAME } from '../../projects/format';
+import { cleanProjectName, DEFAULT_PROJECT_NAME, nextVariantName } from '../../projects/format';
 import type { ProjectSummary } from '../../projects/storage';
 import { ROOM_SHAPE_LABELS } from '../../config/room';
 import type { RoomShape } from '../../types/room';
 import { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog';
 import { ProjectBar, type ProjectNotice, type ProjectStatus } from './ProjectBar';
 import { ProjectsDialog } from './ProjectsDialog';
+import { RecoveryDialog } from './RecoveryDialog';
 import { SaveProjectDialog } from './SaveProjectDialog';
 
 const NOTICE_DURATION_MS = 4000;
@@ -24,13 +25,13 @@ interface ProjectManagerProps {
 
 /** Projektleiste und alle Projekt-Dialoge (Speichern, Übersicht, Bestätigungen). */
 export function ProjectManager({ session, onPlanReplaced, onModalChange, onOpenExport }: ProjectManagerProps) {
-  const [dialog, setDialog] = useState<'projects' | 'save' | null>(null);
+  const [dialog, setDialog] = useState<'projects' | 'save' | 'save-as' | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [listError, setListError] = useState<string | null>(null);
   const [notice, setNotice] = useState<ProjectNotice | null>(null);
 
-  const modalOpen = dialog !== null || confirm !== null;
+  const modalOpen = dialog !== null || confirm !== null || session.recoveryOffer !== null;
   useEffect(() => onModalChange(modalOpen), [modalOpen, onModalChange]);
 
   useEffect(() => {
@@ -40,6 +41,19 @@ export function ProjectManager({ session, onPlanReplaced, onModalChange, onOpenE
   }, [notice]);
 
   const name = session.current?.name ?? DEFAULT_PROJECT_NAME;
+
+  // Autosave: Hinweise zu unbrauchbaren Entwürfen (beim Start) und zu Schreibfehlern (einmalig).
+  const { recoveryNotice, clearRecoveryNotice, autosaveError } = session;
+  useEffect(() => {
+    if (!recoveryNotice) return;
+    setNotice({ kind: 'warning', text: recoveryNotice });
+    clearRecoveryNotice();
+  }, [recoveryNotice, clearRecoveryNotice]);
+  useEffect(() => {
+    if (autosaveError) {
+      setNotice({ kind: 'error', text: `Automatische Sicherung nicht möglich: ${autosaveError} Zur Sicherheit über „Export“ eine Projektdatei speichern.` });
+    }
+  }, [autosaveError]);
   const status: ProjectStatus = session.dirty ? 'dirty' : session.current ? 'saved' : 'new';
 
   const refresh = useCallback(() => {
@@ -63,12 +77,14 @@ export function ProjectManager({ session, onPlanReplaced, onModalChange, onOpenE
     else setDialog('save');
   }, [session, saveAs]);
 
-  // Strg/⌘ + S speichert (statt „Seite speichern“ des Browsers).
+  // Strg/⌘ + S speichert (statt „Seite speichern“ des Browsers), mit Umschalt: „Speichern unter“.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
       event.preventDefault();
-      if (!modalOpen) handleSave();
+      if (modalOpen) return;
+      if (event.shiftKey) setDialog('save-as');
+      else handleSave();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -200,7 +216,39 @@ export function ProjectManager({ session, onPlanReplaced, onModalChange, onOpenE
           onDelete={deleteProject}
           onNew={startNewProject}
           onImport={(file) => void importFile(file)}
+          onSaveAs={() => setDialog('save-as')}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'save-as' && (
+        <SaveProjectDialog
+          saveAs
+          initialName={nextVariantName(name)}
+          onSave={(newName) => {
+            setDialog(null);
+            const result = session.saveAs(newName);
+            setNotice(
+              result.ok
+                ? { kind: 'success', text: `Als „${cleanProjectName(newName)}“ gespeichert – das bisherige Projekt bleibt unverändert.` }
+                : { kind: 'error', text: result.error },
+            );
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {session.recoveryOffer && (
+        <RecoveryDialog
+          offer={session.recoveryOffer}
+          onRestore={() => {
+            session.restoreRecovery();
+            onPlanReplaced();
+            setNotice({ kind: 'warning', text: 'Änderungen wiederhergestellt – noch nicht gespeichert.' });
+          }}
+          onDiscard={() => {
+            const result = session.discardRecovery();
+            onPlanReplaced();
+            setNotice(result.ok ? { kind: 'success', text: 'Nicht gespeicherte Änderungen verworfen.' } : { kind: 'error', text: result.error });
+          }}
         />
       )}
       {dialog === 'save' && (

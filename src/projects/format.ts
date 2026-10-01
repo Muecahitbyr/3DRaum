@@ -41,8 +41,11 @@ export const PROJECT_FORMAT = 'raumplaner-project';
  *      Tischlampen mit Standhöhe (`elevation`).
  * - 6: neue Öffnungsart „Durchgang“ (`type: 'passage'`: Wand, Position, Breite, Höhe).
  *      Bestehende Daten bleiben unverändert.
+ * - 7: neue Möbeltypen (Küche, Bad, Teppich, Pflanze) und Wandoberfläche „Fliesen“.
+ *      Ältere Leser würden diese Einträge sonst stillschweigend verwerfen; mit Version 7
+ *      melden sie verständlich „neuere Version“. Bestehende Daten bleiben unverändert.
  */
-export const PROJECT_FORMAT_VERSION = 6;
+export const PROJECT_FORMAT_VERSION = 7;
 
 /**
  * Gespeichertes Projekt. Enthält nur den Plan – keine Auswahl,
@@ -140,7 +143,16 @@ const MIGRATIONS: Record<number, (data: Record<string, unknown>) => Record<strin
   },
   // 5 → 6: nur neue Öffnungsart (Durchgang) – Türen, Fenster und Geometrie bleiben exakt gleich.
   5: (data) => ({ ...data, version: 6 }),
+  // 6 → 7: nur neue Möbeltypen und Wandoberfläche – alles Bestehende bleibt exakt gleich.
+  6: (data) => ({ ...data, version: 7 }),
 };
+
+/** Namensvorschlag für „Speichern unter“: „Wohnzimmer“ → „Wohnzimmer Variante 2“ → „… Variante 3“. */
+export function nextVariantName(name: string): string {
+  const match = /^(.*\S)\s+Variante\s+(\d+)$/.exec(name.trim());
+  const proposal = match ? `${match[1]} Variante ${Number(match[2]) + 1}` : `${name.trim() || DEFAULT_PROJECT_NAME} Variante 2`;
+  return proposal.slice(0, PROJECT_NAME_MAX_LENGTH);
+}
 
 export function cleanProjectName(name: unknown): string {
   const text = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ').slice(0, PROJECT_NAME_MAX_LENGTH) : '';

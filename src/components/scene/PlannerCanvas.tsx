@@ -162,7 +162,9 @@ export function PlannerCanvas({
 
   return (
     <Canvas
-      shadows
+      // PCF-Schatten: three.js hat PCFSoftShadowMap (R3F-Standard bei `shadows`) entfernt und fiel
+      // mit einer Konsolenwarnung ohnehin auf PCF zurück – gleiches Bild, keine Warnung.
+      shadows="percentage"
       flat
       dpr={[1, 2]}
       // Nur bei Änderungen rendern: Prop-Änderungen, Kamerasteuerung (drei ruft invalidate) und

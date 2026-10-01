@@ -141,6 +141,8 @@ export const WALL_FINISHES: Record<WallFinish, { label: string; roughness: numbe
   matte: { label: 'Matt', roughness: 0.9, bumpScale: 0, repeatSize: 1 },
   plaster: { label: 'Feinputz', roughness: 0.95, bumpScale: 0.25, repeatSize: 0.5 },
   concrete: { label: 'Betonoptik', roughness: 0.85, bumpScale: 0.3, repeatSize: 2 },
+  // Wandfliesen 20 × 20 cm (Küche, Bad): 4 × 4 Fliesen je Texturkachel, glänzender, vertiefte Fugen.
+  tiles: { label: 'Fliesen', roughness: 0.35, bumpScale: 0.6, repeatSize: 0.8 },
 };
 export const WALL_FINISH_IDS = Object.keys(WALL_FINISHES) as WallFinish[];
 export const wallFinishOf = (design: RoomDesign, wallId: string): WallFinish => design.wallFinishes[wallId] ?? DEFAULT_WALL_FINISH;

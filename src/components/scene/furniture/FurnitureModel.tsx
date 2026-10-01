@@ -1,11 +1,22 @@
 import type { ComponentType } from 'react';
 import { FURNITURE_CATALOG, FURNITURE_COLORS } from '../../../config/furniture';
 import type { FurnitureItem, FurnitureType } from '../../../types/furniture';
+import { BathtubModel, ShowerModel, ToiletModel, WashbasinModel } from './models/BathModels';
 import { BedModel } from './models/BedModel';
 import { CabinetModel } from './models/CabinetModel';
 import { ChairModel } from './models/ChairModel';
 import { CoffeeTableModel } from './models/CoffeeTableModel';
+import { PlantModel, RugModel } from './models/DecorModels';
 import { DeskModel } from './models/DeskModel';
+import {
+  FridgeModel,
+  KitchenBaseModel,
+  KitchenIslandModel,
+  KitchenSinkModel,
+  KitchenStoveModel,
+  KitchenTallModel,
+  KitchenWallModel,
+} from './models/KitchenModels';
 import { LampModel } from './models/LampModel';
 import { OfficeChairModel } from './models/OfficeChairModel';
 import { ShelfModel } from './models/ShelfModel';
@@ -38,6 +49,19 @@ const PROCEDURAL_MODELS: Record<FurnitureType, ComponentType<FurnitureModelProps
   'pendant-light': lamp('pendant-light'),
   'floor-lamp': lamp('floor-lamp'),
   'table-lamp': lamp('table-lamp'),
+  'kitchen-base': KitchenBaseModel,
+  'kitchen-sink': KitchenSinkModel,
+  'kitchen-stove': KitchenStoveModel,
+  'kitchen-wall': KitchenWallModel,
+  'kitchen-tall': KitchenTallModel,
+  fridge: FridgeModel,
+  'kitchen-island': KitchenIslandModel,
+  toilet: ToiletModel,
+  washbasin: WashbasinModel,
+  shower: ShowerModel,
+  bathtub: BathtubModel,
+  rug: RugModel,
+  plant: PlantModel,
 };
 
 /**

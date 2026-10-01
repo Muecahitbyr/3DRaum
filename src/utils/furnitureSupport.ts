@@ -17,7 +17,7 @@ import { pointInPolygon } from './polygon';
 type Placed = Pick<FurnitureItem, 'id' | 'type' | 'position' | 'width' | 'depth' | 'height' | 'rotationDeg' | 'elevation'>;
 
 /** Kann dieses Möbel auf einem anderen stehen (Tischlampe)? */
-export const canStandOnSurface = (type: FurnitureItem['type']) => !!FURNITURE_CATALOG[type].elevation;
+export const canStandOnSurface = (type: FurnitureItem['type']) => FURNITURE_CATALOG[type].standsOnSurface === true;
 
 /** Träger unter dem Mittelpunkt (höchste Oberkante) oder `null`. */
 export function supportOf<T extends Placed>(item: Placed, all: readonly T[]): T | null {

@@ -4,9 +4,10 @@ import { polygonWalls } from '../lib/scenes.mjs';
 /**
  * Speicherkompatibilität: dasselbe logische Projekt in allen Formatversionen
  * (1 = altes Rechteck ohne Gestaltung, 2 = vor Raumobjekten/Türanschlag, 3 = vor freien
- * Raumformen, 4 = vor Decke/Licht, 5 = vor Durchgängen, 6 = aktuell) muss nach der Migration
- * denselben Plan und in der 3D-Szene exakt dieselbe Geometrie ergeben. Dazu L-Form und
- * freie Form 4 → 6 sowie ein Durchgang (neu in Version 6): speichern, laden, Datei.
+ * Raumformen, 4 = vor Decke/Licht, 5 = vor Durchgängen, 6 = vor Küche/Bad/Teppich, 7 = aktuell)
+ * muss nach der Migration denselben Plan und in der 3D-Szene exakt dieselbe Geometrie ergeben.
+ * Dazu L-Form und freie Form 4 → 7, ein Durchgang (neu in Version 6) sowie Küchen-, Bad- und
+ * Dekomöbel (neu in Version 7): speichern, laden, Datei.
  */
 const results = [];
 const check = (name, ok, detail = '') => { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`); };
@@ -58,6 +59,8 @@ const versions = {
   },
 };
 versions[6] = { ...versions[5], ...meta(6, 'v6') };
+versions[7] = { ...versions[5], ...meta(7, 'v7') };
+const CURRENT = 7;
 
 // ---------- 1. Datenebene (Parser direkt aus den Dev-Modulen)
 const parsed = await page.evaluate(async (versions) => {
@@ -70,12 +73,13 @@ const parsed = await page.evaluate(async (versions) => {
   out.defaultDesign = format.DEFAULT_PLAN.design;
   return out;
 }, versions);
-for (const v of [1, 2, 3, 4, 5, 6]) check(`Version ${v}: lesbar, ohne Warnungen, auf Version 6 gehoben`, parsed[v].ok && parsed[v].version === 6 && parsed[v].warnings.length === 0, JSON.stringify(parsed[v].error ?? parsed[v].warnings));
+for (const v of [1, 2, 3, 4, 5, 6, 7]) check(`Version ${v}: lesbar, ohne Warnungen, auf Version ${CURRENT} gehoben`, parsed[v].ok && parsed[v].version === CURRENT && parsed[v].warnings.length === 0, JSON.stringify(parsed[v].error ?? parsed[v].warnings));
 const strip = (plan, design = true) => JSON.stringify({ ...plan, design: design ? plan.design : undefined });
-for (const v of [2, 3, 4, 5]) check(`Version ${v} → 6: Plan identisch mit aktuellem Format`, strip(parsed[v].plan) === strip(parsed[6].plan), v);
-check('Version 1 → 6: Geometrie, Öffnungen, Möbel identisch', strip(parsed[1].plan, false) === strip(parsed[6].plan, false));
+for (const v of [2, 3, 4, 5, 6]) check(`Version ${v} → 7: Plan identisch mit aktuellem Format`, strip(parsed[v].plan) === strip(parsed[7].plan), v);
+check('Version 1 → 7: Geometrie, Öffnungen, Möbel identisch', strip(parsed[1].plan, false) === strip(parsed[7].plan, false));
 check('Version 5 → 6: Türen und Fenster unverändert', JSON.stringify(parsed[5].plan.openings) === JSON.stringify(parsed[6].plan.openings) && parsed[6].plan.openings.every((o) => o.type !== 'passage'));
-check('Version 1 → 6: Standardgestaltung + bisherige Beleuchtung', parsed[1].plan.design.floor === parsed.defaultDesign.floor && parsed[1].plan.design.lighting.preset === 'neutral' && parsed[1].plan.design.lighting.brightness === 1 && parsed[1].plan.design.ceilingColor === '#ffffff');
+check('Version 6 → 7: Plan vollständig unverändert (reine Versionsanhebung)', JSON.stringify(parsed[6].plan) === JSON.stringify(parsed[7].plan));
+check('Version 1 → 7: Standardgestaltung + bisherige Beleuchtung', parsed[1].plan.design.floor === parsed.defaultDesign.floor && parsed[1].plan.design.lighting.preset === 'neutral' && parsed[1].plan.design.lighting.brightness === 1 && parsed[1].plan.design.ceilingColor === '#ffffff');
 check('Version 1/2 → 3: Türanschlag wie bisher (Süd: rechts, nach innen), Fenster einflügelig', ['1', '2'].every((v) => { const o = parsed[v].plan.openings; return o[0].hinge === 'right' && o[0].swing === 'inward' && o[1].sashes === 1; }));
 check('Version 3 → 4: Süd-/West-Abstände auf Wandanfang umgerechnet', parsed[3].plan.openings[0].offset === 3.1 && parsed[3].plan.openings[1].offset === 2.3 && parsed[3].plan.openings[2].offset === 1.5);
 
@@ -85,7 +89,7 @@ const trimmed = await page.evaluate(async (data) => {
   copy.plan.furniture[0].name = '  Sofa groß  ';
   const r = format.parseProject(JSON.stringify(copy));
   return r.ok ? r.project.plan.furniture[0].name : r.error;
-}, versions[6]);
+}, versions[7]);
 check('Einlesen: Möbelnamen ohne Leerzeichen am Rand, Wörter erhalten', trimmed === 'Sofa groß', trimmed);
 
 // ---------- 2. Szenenebene: identische 3D-Geometrie nach dem Öffnen
@@ -117,22 +121,22 @@ async function openVersion(data) {
 const sigs = {};
 const eastFaces = () => page.evaluate(() => window.__PLANNER_R3F__().scene.getObjectByName('wall-east-body').geometry.attributes.position.count);
 let eastPlain = 0;
-for (const v of [6, 5, 4, 3, 2, 1]) {
+for (const v of [7, 6, 5, 4, 3, 2, 1]) {
   await openVersion(versions[v]);
   sigs[v] = await signature();
-  if (v === 6) eastPlain = await eastFaces();
+  if (v === 7) eastPlain = await eastFaces();
 }
-check('Szene: Wände, Öffnungen und Möbel vorhanden', sigs[6].length >= 10, `${sigs[6].length} Objekte`);
-for (const v of [1, 2, 3, 4, 5]) {
-  const diff = sigs[v].filter((x, i) => x !== sigs[6][i]);
-  check(`Szene Version ${v}: geometrisch identisch mit Version 6`, sigs[v].length === sigs[6].length && diff.length === 0, diff.slice(0, 2).join(' | '));
+check('Szene: Wände, Öffnungen und Möbel vorhanden', sigs[7].length >= 10, `${sigs[7].length} Objekte`);
+for (const v of [1, 2, 3, 4, 5, 6]) {
+  const diff = sigs[v].filter((x, i) => x !== sigs[7][i]);
+  check(`Szene Version ${v}: geometrisch identisch mit Version 7`, sigs[v].length === sigs[7].length && diff.length === 0, diff.slice(0, 2).join(' | '));
 }
 // Speichern hebt die Datei auf das aktuelle Format
 await page.getByTestId('project-save').click(); await settle(300);
 const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('raumplaner:project:v1')));
-check('Version 1 nach dem Speichern: Format 6, gleicher Name', stored.version === 6 && stored.name === 'Version 1' && stored.plan.room.walls.length === 4);
+check('Version 1 nach dem Speichern: Format 7, gleicher Name', stored.version === 7 && stored.name === 'Version 1' && stored.plan.room.walls.length === 4);
 
-// ---------- 3. L-Form und freie Form (diagonale Wand) 4 → 5 → 6
+// ---------- 3. L-Form und freie Form (diagonale Wand) 4 → 5 → 6 → 7
 const lCorners = [[0, 0], [6, 0], [6, 3], [3.5, 3], [3.5, 5], [0, 5]];
 const freeCorners = [[0, 0], [5, 0], [5, 2.5], [3.5, 4], [0, 4]];
 for (const [label, shape, corners] of [['L-Form', 'l-shape', lCorners], ['Freie Form', 'free', freeCorners]]) {
@@ -148,13 +152,17 @@ for (const [label, shape, corners] of [['L-Form', 'l-shape', lCorners], ['Freie 
   const v4 = { ...meta(4, `${shape}-v4`), plan: { ...base, design: { floor: 'tiles', wallColors: colors5 } } };
   const v5 = { ...meta(5, `${shape}-v5`), plan: { ...base, design: { floor: 'tiles', wallColors: colors5, wallFinishes: {}, ceilingColor: '#ffffff', lighting: { preset: 'neutral', brightness: 1 } } } };
   const v6 = { ...v5, ...meta(6, `${shape}-v6`) };
+  const v7 = { ...v5, ...meta(7, `${shape}-v7`) };
+  await openVersion(v7); const s7 = await signature();
   await openVersion(v6); const s6 = await signature();
   await openVersion(v5); const s5 = await signature();
   await openVersion(v4); const s4 = await signature();
-  check(`${label} 4 → 6: geometrisch identisch`, s4.length === s6.length && s4.every((x, i) => x === s6[i]), `${s4.length}/${s6.length}`);
-  check(`${label} 5 → 6: geometrisch identisch`, s5.length === s6.length && s5.every((x, i) => x === s6[i]), `${s5.length}/${s6.length}`);
+  const same = (a) => a.length === s7.length && a.every((x, i) => x === s7[i]);
+  check(`${label} 4 → 7: geometrisch identisch`, same(s4), `${s4.length}/${s7.length}`);
+  check(`${label} 5 → 7: geometrisch identisch`, same(s5), `${s5.length}/${s7.length}`);
+  check(`${label} 6 → 7: geometrisch identisch`, same(s6), `${s6.length}/${s7.length}`);
   const lighting = await page.getByTestId('lighting-preset').locator('[aria-pressed="true"]').textContent().catch(() => '');
-  check(`${label} 4 → 6: bisherige Beleuchtung „Neutral“`, lighting.includes('Neutral'), lighting);
+  check(`${label} 4 → 7: bisherige Beleuchtung „Neutral“`, lighting.includes('Neutral'), lighting);
 }
 
 // ---------- 4. Durchgang (neu in Version 6): öffnen, Szene, speichern, Datei
@@ -165,18 +173,48 @@ const withPassage = {
 };
 await openVersion(withPassage);
 const passageSig = await signature();
-check('Durchgang: in der Szene als Öffnung der Ostwand (mit Wandaussparung)', passageSig.length === sigs[6].length + 1 && passageSig.some((x) => x.startsWith('opening-4,')), `${passageSig.length}`);
+check('Durchgang: in der Szene als Öffnung der Ostwand (mit Wandaussparung)', passageSig.length === sigs[7].length + 1 && passageSig.some((x) => x.startsWith('opening-4,')), `${passageSig.length}`);
 const eastWithPassage = await eastFaces();
 check('Durchgang: Ostwand hat eine echte Aussparung (mehr Flächen als ohne Öffnung)', eastWithPassage > eastPlain, `${eastPlain} → ${eastWithPassage}`);
 await page.getByTestId('project-save').click(); await settle(300);
 const storedPassage = await page.evaluate(() => JSON.parse(localStorage.getItem('raumplaner:project:durchgang')));
 const savedPassage = storedPassage.plan.openings.find((o) => o.type === 'passage');
-check('Durchgang gespeichert (Version 6): Wand, Position, Breite, Höhe – ohne Tür-/Fensterfelder', storedPassage.version === 6 && savedPassage && savedPassage.wall === 'east' && savedPassage.offset === 1.4 && savedPassage.width === 1.2 && savedPassage.height === 2.1 && !('hinge' in savedPassage) && !('sillHeight' in savedPassage), JSON.stringify(savedPassage));
+check('Durchgang gespeichert (Version 7): Wand, Position, Breite, Höhe – ohne Tür-/Fensterfelder', storedPassage.version === 7 && savedPassage && savedPassage.wall === 'east' && savedPassage.offset === 1.4 && savedPassage.width === 1.2 && savedPassage.height === 2.1 && !('hinge' in savedPassage) && !('sillHeight' in savedPassage), JSON.stringify(savedPassage));
 await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
 await page.getByTestId('projects-button').click(); await settle(300);
 await page.locator('[data-project-id="durchgang"]').getByTestId('project-open').click(); await settle(900);
 const reloaded = await signature();
 check('Durchgang nach Neuladen: Szene identisch', reloaded.length === passageSig.length && reloaded.every((x, i) => x === passageSig[i]));
+
+// ---------- 5. Küche, Bad, Teppich, Pflanze, Wandfliesen (neu in Version 7): öffnen, speichern, neu laden
+const newItems = [
+  { id: 'furniture-1', type: 'kitchen-base', name: 'Unterschrank', width: 0.6, depth: 0.6, height: 0.9, position: { x: 0.3, z: 0.3 }, rotationDeg: 0, colors: { main: '#2f4f6f', wood: '#c9b28f' } },
+  { id: 'furniture-2', type: 'kitchen-wall', name: 'Oberschrank', width: 0.6, depth: 0.35, height: 0.7, position: { x: 0.3, z: 0.18 }, rotationDeg: 0, elevation: 1.5 },
+  { id: 'furniture-3', type: 'fridge', name: 'Kühlschrank', width: 0.6, depth: 0.65, height: 2, position: { x: 0.9, z: 0.33 }, rotationDeg: 0 },
+  { id: 'furniture-4', type: 'bathtub', name: 'Wanne', width: 1.7, depth: 0.75, height: 0.6, position: { x: 4.15, z: 3.62 }, rotationDeg: 180 },
+  { id: 'furniture-5', type: 'rug', name: 'Teppich', width: 2, depth: 1.4, height: 0.01, position: { x: 2.5, z: 2 }, rotationDeg: 0, colors: { fabric: '#7a5c8e' } },
+  { id: 'furniture-6', type: 'plant', name: 'Pflanze', width: 0.45, depth: 0.45, height: 1.2, position: { x: 4.6, z: 0.4 }, rotationDeg: 0 },
+];
+const v7Items = {
+  ...meta(7, 'neu-v7'),
+  plan: { ...versions[7].plan, openings: [], furniture: newItems, design: { ...versions[7].plan.design, wallFinishes: { north: 'tiles' } } },
+};
+await openVersion(v7Items);
+const itemsSig = await signature();
+check('Version 7: Küchen-, Bad- und Dekomöbel erscheinen in der Szene', newItems.every((f) => itemsSig.some((x) => x.includes(f.id))), `${itemsSig.length}`);
+const parsedItems = await page.evaluate(async (d) => (await import('/src/projects/format.ts')).parseProject(JSON.stringify(d)), v7Items);
+check('Version 7: Elemente ohne Warnung gelesen (Oberschrank-Höhe, Farben, Wandfliesen)', parsedItems.ok && parsedItems.warnings.length === 0 && parsedItems.project.plan.furniture.length === 6 && parsedItems.project.plan.furniture[1].elevation === 1.5 && parsedItems.project.plan.furniture[4].colors.fabric === '#7a5c8e' && parsedItems.project.plan.design.wallFinishes.north === 'tiles', JSON.stringify(parsedItems.warnings ?? parsedItems.error));
+await page.getByTestId('project-save').click(); await settle(300);
+const storedItems = await page.evaluate(() => JSON.parse(localStorage.getItem('raumplaner:project:neu-v7')));
+check('Gespeichert (Version 7): Möbel, Höhen, Farben und Fliesen unverändert', storedItems.version === 7 && JSON.stringify(storedItems.plan.furniture) === JSON.stringify(parsedItems.project.plan.furniture) && storedItems.plan.design.wallFinishes.north === 'tiles');
+await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
+await page.getByTestId('projects-button').click(); await settle(300);
+await page.locator('[data-project-id="neu-v7"]').getByTestId('project-open').click(); await settle(900);
+const itemsReloaded = await signature();
+check('Version 7 nach Neuladen: Szene identisch', itemsReloaded.length === itemsSig.length && itemsReloaded.every((x, i) => x === itemsSig[i]));
+const future = { ...versions[7], ...meta(8, 'zukunft') };
+const futureResult = await page.evaluate(async (d) => (await import('/src/projects/format.ts')).parseProject(JSON.stringify(d)), future);
+check('Version 8 (Zukunft): verständlich abgelehnt', !futureResult.ok && futureResult.error.includes('neueren Version'), futureResult.error);
 
 check('Keine Konsolenfehler', errors.length === 0, errors.slice(0, 3).join(' | '));
 const failed = results.filter((x) => !x.ok).length;

@@ -172,7 +172,7 @@ await page.getByTestId('project-save').click(); await settle();
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').fill('Gestaltung 5');
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').press('Enter'); await settle(200);
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
-check('Gespeichert (Version 6): Boden, Wandoberfläche, Deckenfarbe, Lichtstimmung', stored.version === 6 && stored.plan.design.floor === 'herringbone' && stored.plan.design.wallFinishes.north === 'plaster' && stored.plan.design.ceilingColor === '#dfe8f2' && stored.plan.design.lighting.preset === 'warm' && stored.plan.design.lighting.brightness === 1, JSON.stringify(stored.plan.design));
+check('Gespeichert (Version 7): Boden, Wandoberfläche, Deckenfarbe, Lichtstimmung', stored.version === 7 && stored.plan.design.floor === 'herringbone' && stored.plan.design.wallFinishes.north === 'plaster' && stored.plan.design.ceilingColor === '#dfe8f2' && stored.plan.design.lighting.preset === 'warm' && stored.plan.design.lighting.brightness === 1, JSON.stringify(stored.plan.design));
 await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
 await page.getByTestId('projects-button').click(); await settle();
 await page.getByTestId('project-item').filter({ hasText: 'Gestaltung 5' }).getByTestId('project-open').click(); await settle(700);

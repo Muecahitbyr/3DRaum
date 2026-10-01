@@ -66,7 +66,8 @@ export function FurnitureLayer({
         // Kontaktschatten als eigene Ebene – nicht Teil der Möbelgruppen (deren Maße bleiben exakt).
         <group name="contact-shadows">
           {furniture.map((item) => {
-            if (isCeilingMounted(item.type) || furnitureBaseY(item, room.dimensions.height, support.get(item.id)) !== 0) return null;
+            // Kein Kontaktschatten für Teppiche (liegen flach) und erhöhte Möbel (Decke, Wand, Träger).
+            if (item.type === 'rug' || isCeilingMounted(item.type) || furnitureBaseY(item, room.dimensions.height, support.get(item.id)) !== 0) return null;
             const world = furnitureToWorld(item.position, room);
             return (
               <group key={item.id} position={[world.x, 0, world.z]} rotation-y={furnitureRotationY(item.rotationDeg)} userData={{ shadowOf: item.id }}>

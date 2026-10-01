@@ -17,7 +17,7 @@ export type FloorMaterialId =
 export type HexColor = string;
 
 /** Oberfläche einer Wand (zusätzlich zur Farbe). */
-export type WallFinish = 'matte' | 'plaster' | 'concrete';
+export type WallFinish = 'matte' | 'plaster' | 'concrete' | 'tiles';
 
 /** Lichtstimmung der Grundbeleuchtung. */
 export type LightingPreset = 'daylight' | 'warm' | 'neutral' | 'cool';

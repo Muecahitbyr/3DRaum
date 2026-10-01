@@ -59,13 +59,54 @@ export interface WallTextures {
   bump: CanvasTexture;
 }
 
+/**
+ * Fliesen (4 × 4 je Kachel): helle Flächen mit minimaler Tonwertstreuung je Fliese und
+ * dunklerer, im Relief vertiefter Fuge. Farbe weiterhin aus der Wandfarbe (multipliziert).
+ */
+function tileCanvases(size: number): { color: HTMLCanvasElement; bump: HTMLCanvasElement } {
+  const tiles = 4;
+  const cell = size / tiles;
+  const grout = Math.max(2, Math.round(size / 128));
+  const rng = mulberry32(211);
+  const color = document.createElement('canvas');
+  const bump = document.createElement('canvas');
+  color.width = color.height = bump.width = bump.height = size;
+  const c = color.getContext('2d')!;
+  const b = bump.getContext('2d')!;
+  c.fillStyle = 'rgb(196,196,196)';
+  c.fillRect(0, 0, size, size);
+  b.fillStyle = 'rgb(0,0,0)';
+  b.fillRect(0, 0, size, size);
+  for (let i = 0; i < tiles; i++) {
+    for (let j = 0; j < tiles; j++) {
+      const v = Math.round(244 + (rng() - 0.5) * 10);
+      c.fillStyle = `rgb(${v},${v},${v})`;
+      // Fuge halbiert an den Kachelrändern – beim Kacheln ergibt sich eine durchgehende Fuge.
+      c.fillRect(i * cell + grout / 2, j * cell + grout / 2, cell - grout, cell - grout);
+      b.fillStyle = 'rgb(255,255,255)';
+      b.fillRect(i * cell + grout / 2, j * cell + grout / 2, cell - grout, cell - grout);
+    }
+  }
+  return { color, bump };
+}
+
 const cache = new Map<WallFinish, WallTextures | null>();
 
 /** Texturen einer Oberfläche (`null` für Matt). */
 export function getWallTextures(finish: WallFinish): WallTextures | null {
   if (cache.has(finish)) return cache.get(finish)!;
   let result: WallTextures | null = null;
-  if (finish !== 'matte') {
+  if (finish === 'tiles') {
+    const { color, bump } = tileCanvases(256);
+    const map = new CanvasTexture(color);
+    map.colorSpace = SRGBColorSpace;
+    const bumpMap = new CanvasTexture(bump);
+    for (const texture of [map, bumpMap]) {
+      texture.wrapS = texture.wrapT = RepeatWrapping;
+      texture.anisotropy = 4;
+    }
+    result = { map, bump: bumpMap };
+  } else if (finish !== 'matte') {
     const size = 256;
     const values =
       finish === 'plaster'

@@ -24,11 +24,13 @@ interface ProjectsDialogProps {
   onNew: (shape: RoomShape) => void;
   /** Projektdatei (.3draum) importieren. */
   onImport: (file: File) => void;
+  /** Aktuellen Stand als neues Projekt speichern („Speichern unter“). */
+  onSaveAs: () => void;
   onClose: () => void;
 }
 
 /** Übersicht der lokal gespeicherten Projekte. */
-export function ProjectsDialog({ projects, currentId, error, onOpen, onRename, onDelete, onNew, onImport, onClose }: ProjectsDialogProps) {
+export function ProjectsDialog({ projects, currentId, error, onOpen, onRename, onDelete, onNew, onImport, onSaveAs, onClose }: ProjectsDialogProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [shape, setShape] = useState<RoomShape>('rectangle');
@@ -51,6 +53,12 @@ export function ProjectsDialog({ projects, currentId, error, onOpen, onRename, o
             Neues Projekt
           </Button>
         </div>
+      </div>
+      <div className={styles.importRow}>
+        <span>Variante anlegen: aktuellen Stand als neues Projekt sichern (Original bleibt unverändert).</span>
+        <Button onClick={onSaveAs} data-testid="project-save-as" title="Speichern unter (Strg/⌘ + Umschalt + S)">
+          Speichern unter …
+        </Button>
       </div>
       <div className={styles.importRow}>
         <span>Von einem anderen Gerät? Projektdatei ({PROJECT_FILE_EXTENSION}) laden:</span>

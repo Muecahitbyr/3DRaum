@@ -7,6 +7,7 @@ import type { FurnitureItem } from '../types/furniture';
 import type { FloorPoint, Meters } from '../types/room';
 import { fixtureFootprint, getFixtureDisplayName } from './fixtures';
 import { furnitureCollide } from '../collision';
+import { collisionShapeOf } from '../collision/furnitureZones';
 import { furnitureBaseY } from './furniture';
 import { supportElevations } from './furnitureSupport';
 import type { RoomModel } from './room/model';
@@ -156,8 +157,10 @@ export function computeClearances(
   // Drei Fälle: geometrischer Abstand (getrennte Grundflächen), erlaubte Überdeckung
   // (Grundflächen überdecken sich, die Bauteile aber nicht – Stuhl unter dem Tisch: wird
   // übergangen) und echte Kollision (Konflikt) nach dem semantischen Kollisionsmodell.
+  // Teppiche sind keine Hindernisse (Kollisionsform „none“) – und messen selbst nur zu Wänden.
+  const flat = (f: FurnitureItem) => collisionShapeOf(f.type) === 'none';
   const others = all
-    .filter((f) => f.id !== item.id)
+    .filter((f) => f.id !== item.id && !flat(f) && !flat(item))
     .filter((f) => {
       const b0 = furnitureBaseY(f, H, support.get(f.id));
       return Math.min(y1, b0 + f.height) - Math.max(y0, b0) > 1e-4;

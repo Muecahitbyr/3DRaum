@@ -13,6 +13,11 @@ interface DialogProps {
   footer?: ReactNode;
   width?: number;
   testId?: string;
+  /**
+   * `false`: Nur über die eigenen Schaltflächen zu schließen (kein Esc, kein Klick daneben,
+   * kein Schließen-Symbol) – für Entscheidungen, die nicht offen bleiben dürfen.
+   */
+  dismissible?: boolean;
 }
 
 /**
@@ -22,13 +27,13 @@ interface DialogProps {
 const isVisible = (el: HTMLElement) => !el.hidden && el.offsetParent !== null;
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
-export function Dialog({ title, onClose, children, footer, width = 460, testId }: DialogProps) {
+export function Dialog({ title, onClose, children, footer, width = 460, testId, dismissible = true }: DialogProps) {
   const id = useId();
   const titleId = `${id}-title`;
   const panelRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
+  const onCloseRef = useRef(dismissible ? onClose : () => {});
   useEffect(() => {
-    onCloseRef.current = onClose;
+    onCloseRef.current = dismissible ? onClose : () => {};
   });
 
   useEffect(() => {
@@ -74,7 +79,7 @@ export function Dialog({ title, onClose, children, footer, width = 460, testId }
     <div
       className={styles.backdrop}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (dismissible && event.target === event.currentTarget) onClose();
       }}
     >
       <div
@@ -91,11 +96,13 @@ export function Dialog({ title, onClose, children, footer, width = 460, testId }
           <h2 id={titleId} className={styles.title}>
             {title}
           </h2>
-          <Button variant="icon" onClick={onClose} aria-label="Schließen" title="Schließen">
-            <svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-              <path d="m3 3 8 8M11 3l-8 8" />
-            </svg>
-          </Button>
+          {dismissible && (
+            <Button variant="icon" onClick={onClose} aria-label="Schließen" title="Schließen">
+              <svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                <path d="m3 3 8 8M11 3l-8 8" />
+              </svg>
+            </Button>
+          )}
         </div>
         <div className={styles.body}>{children}</div>
         {footer && <div className={styles.footer}>{footer}</div>}

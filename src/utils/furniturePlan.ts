@@ -1,3 +1,4 @@
+import { bathtubGeometry, hobGeometry, KITCHEN, sinkGeometry } from '../config/furnitureGeometry';
 import type { FurnitureSize, FurnitureType } from '../types/furniture';
 import { clamp } from './units';
 
@@ -154,7 +155,106 @@ export function furniturePlanDetails(type: FurnitureType, { width: w, depth: d }
       const front = hd - 0.03;
       return [rect(hw - pedestal, -hd + 0.03, hw - 0.03, front), seg(-hw + 0.03, front, hw - pedestal, front)];
     }
+    // ---------- Küche
+    case 'kitchen-base':
+    case 'kitchen-wall':
+      // Front mit Türteilung (Oberschrank: Umriss gestrichelt, siehe FurniturePlanSymbol)
+      return kitchenFront(w, d);
+    case 'kitchen-sink': {
+      const s = sinkGeometry(w, d);
+      return [
+        ...kitchenFront(w, d),
+        rect(-s.basinW / 2, s.basinZ - s.basinD / 2, s.basinW / 2, s.basinZ + s.basinD / 2),
+        circle(0, s.basinZ, 0.025, 12),
+        seg(0, s.tapZ, 0, s.tapZ + 0.1),
+      ];
+    }
+    case 'kitchen-stove':
+      return [...kitchenFront(w, d), ...hobGeometry(w, d).zones.map(([x, z, r]) => circle(x, z, r, 20))];
+    case 'kitchen-tall':
+      // Hochschrank: Diagonalkreuz (übliche Darstellung raumhoher Schränke)
+      return [seg(-hw, -hd, hw, hd), seg(-hw, hd, hw, -hd), ...kitchenFront(w, d)];
+    case 'fridge':
+      return [seg(-hw, hd - 0.04, hw, hd - 0.04), rect(-hw + 0.05, -hd + 0.05, hw - 0.05, hd - 0.1), seg(-hw + 0.05, -hd + 0.05, hw - 0.05, hd - 0.1)];
+    case 'kitchen-island': {
+      const overhang = Math.min(KITCHEN.islandOverhang, d * 0.3);
+      const lines: PlanPolyline[] = [seg(-hw, -hd + overhang, hw, -hd + overhang), seg(-hw, hd - 0.03, hw, hd - 0.03)];
+      const units = Math.max(2, Math.round(w / 0.6));
+      for (let i = 1; i < units; i++) lines.push(seg(-hw + (w / units) * i, hd - 0.03, -hw + (w / units) * i, hd));
+      return lines;
+    }
+    // ---------- Bad
+    case 'toilet': {
+      const tank = Math.min(0.18, d * 0.26);
+      const bowlD = d - tank;
+      return [rect(-hw, -hd, hw, -hd + tank), ellipse(0, -hd + tank + bowlD / 2, hw - 0.03, bowlD / 2 - 0.02)];
+    }
+    case 'washbasin':
+      return [ellipse(0, 0.03, Math.min(0.24, w * 0.32), Math.min(0.15, d * 0.3)), circle(0, -hd + 0.07, 0.02, 10)];
+    case 'shower':
+      // Duschtasse: Diagonalkreuz und Ablauf (übliches Symbol)
+      return [seg(-hw, -hd, hw, hd), seg(-hw, hd, hw, -hd), circle(0, 0, Math.min(0.05, w / 10), 14)];
+    case 'bathtub': {
+      const g = bathtubGeometry(w, d);
+      const r = Math.min(g.innerD / 2, 0.25);
+      return [roundedRect(-g.innerW / 2, -g.innerD / 2, g.innerW / 2, g.innerD / 2, r), circle(hw - g.rim - 0.12, 0, 0.025, 12)];
+    }
+    // ---------- Einrichtung
+    case 'rug': {
+      const b = Math.min(0.08, Math.min(w, d) * 0.08);
+      const lines: PlanPolyline[] = [rect(-hw + b, -hd + b, hw - b, hd - b)];
+      // Fransen an den Schmalseiten
+      const fringes = Math.max(3, Math.round(d / 0.12));
+      for (let i = 0; i <= fringes; i++) {
+        const z = -hd + (d * i) / fringes;
+        lines.push(seg(-hw, z, -hw - 0.04, z), seg(hw, z, hw + 0.04, z));
+      }
+      return lines;
+    }
+    case 'plant': {
+      const r = Math.min(hw, hd);
+      const lines: PlanPolyline[] = [circle(0, 0, r * 0.45, 20)];
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        lines.push(ellipseRotated(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.42, r * 0.16, a));
+      }
+      return lines;
+    }
   }
+}
+
+/** Front einer Küchenzeile: Linie kurz hinter der Vorderkante, Türteilung ab 65 cm Breite. */
+function kitchenFront(w: number, d: number): PlanPolyline[] {
+  const front = d / 2 - KITCHEN.handle - KITCHEN.front;
+  const lines = [seg(-w / 2, front, w / 2, front)];
+  if (w > 0.65) lines.push(seg(0, front, 0, d / 2));
+  return lines;
+}
+
+function ellipse(cx: number, cz: number, rx: number, rz: number, segments = 32): PlanPolyline {
+  return arc(cx, cz, rx, rz, 0, Math.PI * 2, segments);
+}
+
+/** Gedrehte Ellipse (Blattform der Pflanze). */
+function ellipseRotated(cx: number, cz: number, rx: number, rz: number, angle: number, segments = 16): PlanPolyline {
+  return Array.from({ length: segments + 1 }, (_, i) => {
+    const t = (i / segments) * Math.PI * 2;
+    const x = Math.cos(t) * rx;
+    const z = Math.sin(t) * rz;
+    return [cx + x * Math.cos(angle) - z * Math.sin(angle), cz + x * Math.sin(angle) + z * Math.cos(angle)] as [number, number];
+  });
+}
+
+/** Rechteck mit abgerundeten Ecken (Wannenmulde). */
+function roundedRect(x0: number, z0: number, x1: number, z1: number, r: number): PlanPolyline {
+  const corners: [number, number, number][] = [
+    [x1 - r, z0 + r, -Math.PI / 2],
+    [x1 - r, z1 - r, 0],
+    [x0 + r, z1 - r, Math.PI / 2],
+    [x0 + r, z0 + r, Math.PI],
+  ];
+  const points = corners.flatMap(([cx, cz, a]) => arc(cx, cz, r, r, a, a + Math.PI / 2, 6));
+  return [...points, points[0]];
 }
 
 /** Außenumriss (Grundfläche) eines Möbels. */

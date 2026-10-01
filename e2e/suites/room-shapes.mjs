@@ -384,7 +384,7 @@ await page.getByTestId('project-save').click(); await settle();
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').fill('L-Raum');
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').press('Enter'); await settle(200);
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
-check('Gespeichert (Version 6): Raum mit sechs Wänden (ID, Anfang, Ende, Höhe, Stärke), ohne Ursprung', stored.version === 6 && stored.plan.room.shape === 'l-shape' && stored.plan.room.walls.length === 6 && JSON.stringify(Object.keys(stored.plan.room.walls[0]).sort()) === '["end","height","id","start","thickness"]' && !('origin' in stored.plan.room) && stored.plan.design.wallColors['wall-3'] === '#c98b6b');
+check('Gespeichert (Version 7): Raum mit sechs Wänden (ID, Anfang, Ende, Höhe, Stärke), ohne Ursprung', stored.version === 7 && stored.plan.room.shape === 'l-shape' && stored.plan.room.walls.length === 6 && JSON.stringify(Object.keys(stored.plan.room.walls[0]).sort()) === '["end","height","id","start","thickness"]' && !('origin' in stored.plan.room) && stored.plan.design.wallColors['wall-3'] === '#c98b6b');
 await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
 await page.getByTestId('projects-button').click(); await settle();
 await page.getByTestId('project-item').filter({ hasText: 'L-Raum' }).getByTestId('project-open').click(); await settle(700);

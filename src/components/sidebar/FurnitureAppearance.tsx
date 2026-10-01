@@ -114,7 +114,7 @@ export function FurnitureAppearance({ item, roomHeight, support = null, onChange
       )}
       {definition.elevation && !support && (
         <MeasurementInput
-          label="Standhöhe"
+          label={definition.wallMounted ? 'Montagehöhe' : 'Standhöhe'}
           value={item.elevation ?? definition.elevation.default}
           min={definition.elevation.limits[0]}
           max={Math.min(definition.elevation.limits[1], roomHeight - item.height)}
@@ -122,6 +122,7 @@ export function FurnitureAppearance({ item, roomHeight, support = null, onChange
           onChange={(elevation) => onChange({ elevation })}
         />
       )}
+      {definition.wallMounted && <p className={styles.hint}>Hängt an der Wand – „Montagehöhe“ ist die Unterkante über dem Boden.</p>}
       {isCeilingMounted(item.type) && <p className={styles.hint}>Hängt an der Decke – „Höhe“ ist die Abhängung und folgt der Raumhöhe.</p>}
     </div>
   );

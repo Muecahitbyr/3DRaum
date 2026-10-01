@@ -18,6 +18,8 @@ export const SCENE_COLORS = {
   warning: '#c77c02',
   planWarningFill: '#fdf0d5',
   planSymbol: '#3d4450',
+  /** Teppich im Grundriss: dezente Linien (Möbel darauf bleiben klar erkennbar). */
+  planRugLine: '#b3aa9b',
   gridCell: '#d3d8df',
   gridSection: '#aab3bf',
 } as const;

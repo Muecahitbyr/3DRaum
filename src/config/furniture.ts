@@ -32,9 +32,18 @@ export interface FurnitureDefinition {
   collision?: FurnitureCollisionShape;
   /** Nutzbare Oberseite: Eine Tischlampe darüber steht automatisch darauf. */
   surface?: boolean;
+  /** Steht automatisch auf einem Möbel mit `surface` darunter (Tischlampe). */
+  standsOnSurface?: boolean;
+  /** Hängt an der Wand (Küchenoberschrank): Standhöhe = Unterkante, im Grundriss gestrichelt. */
+  wallMounted?: boolean;
+  /**
+   * Platzsuche beim Hinzufügen: `wall` = mit der Rückseite an eine (achsparallele) Wand
+   * (Küchenzeile, WC, Waschtisch, Wanne …); sonst frei um die Raummitte.
+   */
+  placement?: 'wall';
 }
 
-export type FurnitureCategoryId = 'living' | 'bedroom' | 'dining' | 'office' | 'lamps';
+export type FurnitureCategoryId = 'living' | 'bedroom' | 'dining' | 'kitchen' | 'bath' | 'office' | 'lamps';
 
 export interface FurnitureCategory {
   id: FurnitureCategoryId;
@@ -45,9 +54,15 @@ export interface FurnitureCategory {
 
 /** Kategorien der Möbelbibliothek – Reihenfolge = Anzeige. Neue Kategorien hier ergänzen. */
 export const FURNITURE_CATEGORIES: readonly FurnitureCategory[] = [
-  { id: 'living', label: 'Wohnzimmer', types: ['sofa', 'armchair', 'coffee-table', 'tv-board', 'shelf'] },
-  { id: 'bedroom', label: 'Schlafzimmer', types: ['bed', 'double-bed', 'wardrobe', 'dresser', 'nightstand'] },
+  { id: 'living', label: 'Wohnzimmer', types: ['sofa', 'armchair', 'coffee-table', 'tv-board', 'shelf', 'rug', 'plant'] },
+  { id: 'bedroom', label: 'Schlafzimmer', types: ['bed', 'double-bed', 'wardrobe', 'dresser', 'nightstand', 'rug'] },
   { id: 'dining', label: 'Esszimmer', types: ['table', 'chair', 'sideboard'] },
+  {
+    id: 'kitchen',
+    label: 'Küche',
+    types: ['kitchen-base', 'kitchen-sink', 'kitchen-stove', 'kitchen-wall', 'kitchen-tall', 'fridge', 'kitchen-island'],
+  },
+  { id: 'bath', label: 'Bad', types: ['toilet', 'washbasin', 'shower', 'bathtub'] },
   { id: 'office', label: 'Büro', types: ['desk', 'office-chair', 'shelf'] },
   { id: 'lamps', label: 'Lampen', types: ['ceiling-light', 'pendant-light', 'floor-lamp', 'table-lamp'] },
 ];
@@ -254,6 +269,144 @@ export const FURNITURE_CATALOG: Record<FurnitureType, FurnitureDefinition> = {
     colorSlots: [{ slot: 'main', label: 'Schirm', default: '#efe7d8' }],
     lamp: { light: { on: true, intensity: 1, temperature: 2700 }, candela: 1, sourceAt: 0.72 },
     elevation: { default: 0.75, limits: [0, 1.5] },
+    standsOnSurface: true,
+  },
+  // ---------- Küche (Korpus 60 cm tief, Arbeitshöhe 90 cm, Sockel 10 cm)
+  'kitchen-base': {
+    type: 'kitchen-base',
+    label: 'Küchenunterschrank',
+    keywords: ['Küche', 'Unterschrank', 'Schrank', 'Küchenzeile', 'Arbeitsplatte', 'Schubladen'],
+    defaultSize: { width: 0.6, depth: 0.6, height: 0.9 },
+    limits: { width: [0.3, 1.2], depth: [0.5, 0.7], height: [0.8, 0.95] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Fronten', default: '#eceae5' }, { slot: 'wood', label: 'Arbeitsplatte', default: '#6f6a63' }],
+    surface: true,
+    placement: 'wall',
+  },
+  'kitchen-sink': {
+    type: 'kitchen-sink',
+    label: 'Spülenschrank',
+    keywords: ['Küche', 'Spüle', 'Spülbecken', 'Spülschrank', 'Becken', 'Wasserhahn', 'Schrank'],
+    defaultSize: { width: 0.8, depth: 0.6, height: 0.9 },
+    limits: { width: [0.6, 1.2], depth: [0.5, 0.7], height: [0.8, 0.95] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Fronten', default: '#eceae5' }, { slot: 'wood', label: 'Arbeitsplatte', default: '#6f6a63' }],
+    placement: 'wall',
+  },
+  'kitchen-stove': {
+    type: 'kitchen-stove',
+    label: 'Herd mit Backofen',
+    keywords: ['Küche', 'Herd', 'Ofen', 'Backofen', 'Kochfeld', 'Ceranfeld', 'Induktion'],
+    defaultSize: { width: 0.6, depth: 0.6, height: 0.9 },
+    limits: { width: [0.5, 0.9], depth: [0.5, 0.7], height: [0.8, 0.95] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Fronten', default: '#eceae5' }, { slot: 'wood', label: 'Arbeitsplatte', default: '#6f6a63' }],
+    placement: 'wall',
+  },
+  'kitchen-wall': {
+    type: 'kitchen-wall',
+    label: 'Küchenoberschrank',
+    keywords: ['Küche', 'Oberschrank', 'Hängeschrank', 'Wandschrank', 'Schrank'],
+    defaultSize: { width: 0.6, depth: 0.35, height: 0.7 },
+    limits: { width: [0.3, 1.2], depth: [0.3, 0.4], height: [0.35, 0.9] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Fronten', default: '#eceae5' }],
+    // Wandmontage: „Standhöhe“ = Unterkante über dem Boden (üblich 1,45 m, 55 cm über der Arbeitsplatte).
+    elevation: { default: 1.45, limits: [1.0, 2.4] },
+    wallMounted: true,
+    placement: 'wall',
+  },
+  'kitchen-tall': {
+    type: 'kitchen-tall',
+    label: 'Küchenhochschrank',
+    keywords: ['Küche', 'Hochschrank', 'Vorratsschrank', 'Apothekerschrank', 'Schrank'],
+    defaultSize: { width: 0.6, depth: 0.6, height: 2.0 },
+    limits: { width: [0.3, 1.2], depth: [0.5, 0.7], height: [1.4, 2.4] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Fronten', default: '#eceae5' }],
+    placement: 'wall',
+  },
+  fridge: {
+    type: 'fridge',
+    label: 'Kühlschrank',
+    keywords: ['Küche', 'Kühlschrank', 'Gefrierschrank', 'Kühl-Gefrier-Kombination', 'Kühlkombi'],
+    defaultSize: { width: 0.6, depth: 0.65, height: 2.0 },
+    limits: { width: [0.5, 0.9], depth: [0.55, 0.8], height: [0.8, 2.1] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Gehäuse', default: '#d8dadd' }],
+    placement: 'wall',
+  },
+  'kitchen-island': {
+    type: 'kitchen-island',
+    label: 'Kücheninsel',
+    keywords: ['Küche', 'Insel', 'Kochinsel', 'Theke', 'Tresen', 'Arbeitsplatte'],
+    defaultSize: { width: 1.8, depth: 0.9, height: 0.92 },
+    limits: { width: [1, 3], depth: [0.6, 1.4], height: [0.85, 1] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Fronten', default: '#eceae5' }, { slot: 'wood', label: 'Arbeitsplatte', default: '#6f6a63' }],
+    surface: true,
+  },
+  // ---------- Bad
+  toilet: {
+    type: 'toilet',
+    label: 'WC',
+    keywords: ['Toilette', 'Klo', 'Klosett', 'Bad', 'Badezimmer'],
+    defaultSize: { width: 0.4, depth: 0.7, height: 0.8 },
+    limits: { width: [0.35, 0.5], depth: [0.5, 0.8], height: [0.4, 1] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Keramik', default: '#f7f7f5' }],
+    placement: 'wall',
+  },
+  washbasin: {
+    type: 'washbasin',
+    label: 'Waschtisch',
+    keywords: ['Waschbecken', 'Waschtisch', 'Lavabo', 'Bad', 'Badezimmer', 'Unterschrank'],
+    defaultSize: { width: 0.8, depth: 0.5, height: 0.85 },
+    limits: { width: [0.4, 1.6], depth: [0.35, 0.6], height: [0.7, 0.95] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Keramik', default: '#f7f7f5' }, { slot: 'wood', label: 'Unterschrank', default: '#b08a62' }],
+    placement: 'wall',
+  },
+  shower: {
+    type: 'shower',
+    label: 'Dusche',
+    keywords: ['Duschkabine', 'Duschtasse', 'Brause', 'Bad', 'Badezimmer'],
+    defaultSize: { width: 0.9, depth: 0.9, height: 2 },
+    limits: { width: [0.7, 1.6], depth: [0.7, 1.6], height: [1.8, 2.3] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Duschtasse', default: '#f7f7f5' }],
+    placement: 'wall',
+  },
+  bathtub: {
+    type: 'bathtub',
+    label: 'Badewanne',
+    keywords: ['Wanne', 'Bad', 'Badezimmer', 'Baden'],
+    defaultSize: { width: 1.7, depth: 0.75, height: 0.6 },
+    limits: { width: [1.4, 2], depth: [0.65, 1], height: [0.45, 0.65] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Wanne', default: '#f7f7f5' }],
+    placement: 'wall',
+  },
+  // ---------- Einrichtung
+  rug: {
+    type: 'rug',
+    label: 'Teppich',
+    keywords: ['Läufer', 'Matte', 'Vorleger', 'Bodenbelag'],
+    defaultSize: { width: 2, depth: 1.4, height: 0.01 },
+    limits: { width: [0.6, 4], depth: [0.6, 4], height: [0.005, 0.03] },
+    model: procedural,
+    colorSlots: [{ slot: 'fabric', label: 'Teppich', default: '#b7a58c' }],
+    // Liegt unter Möbeln: keine Kollision (siehe collision/furnitureZones.ts).
+    collision: 'none',
+  },
+  plant: {
+    type: 'plant',
+    label: 'Pflanze',
+    keywords: ['Zimmerpflanze', 'Topfpflanze', 'Grünpflanze', 'Blumen', 'Blumentopf', 'Deko'],
+    defaultSize: { width: 0.45, depth: 0.45, height: 1.2 },
+    limits: { width: [0.2, 1.2], depth: [0.2, 1.2], height: [0.3, 2.2] },
+    model: procedural,
+    colorSlots: [{ slot: 'main', label: 'Topf', default: '#c97b54' }, { slot: 'fabric', label: 'Blätter', default: '#4f7a4a' }],
   },
 };
 
@@ -299,6 +452,27 @@ export const FURNITURE_COLORS = {
   officeFabric: '#3e4a5b',
   chairSeat: '#d9cbb5',
   books: ['#8a4f3d', '#3f5c78', '#c7a24a', '#5f7a5a', '#b5b0a6', '#7a5f8a', '#2f3e4d'],
+  // Küche
+  kitchenFront: '#eceae5',
+  kitchenBody: '#e2dfd8',
+  worktop: '#6f6a63',
+  steel: '#c3c7cc',
+  steelDark: '#9aa0a7',
+  ovenGlass: '#23262b',
+  hob: '#1c1e21',
+  hobZone: '#5a5f66',
+  fridge: '#d8dadd',
+  fridgeDoor: '#e4e6e9',
+  // Bad
+  ceramic: '#f7f7f5',
+  ceramicShade: '#e6e6e2',
+  showerGlass: '#cfe3ee',
+  // Einrichtung
+  rug: '#b7a58c',
+  pot: '#c97b54',
+  soil: '#4a3a2c',
+  leaf: '#4f7a4a',
+  stem: '#5c4a32',
 } as const;
 
 /** Direktes Bearbeiten im Grundriss. Pixelwerte werden mit dem aktuellen Zoom umgerechnet. */

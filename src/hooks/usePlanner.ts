@@ -146,6 +146,8 @@ function describeHistory(
   const pendingEdit = transaction?.kind === 'edit' && !sameDocument(transaction.before, documentOf(present));
   return {
     ...actions,
+    /** Läuft eine Geste (Ziehen, Drehen)? Dann z. B. kein Autosave. */
+    busy: gesture,
     canUndo: !gesture && (past.length > 0 || pendingEdit),
     canRedo: !gesture && !pendingEdit && future.length > 0,
     undoLabel: pendingEdit ? (transaction?.label ?? null) : (past.at(-1)?.label ?? null),

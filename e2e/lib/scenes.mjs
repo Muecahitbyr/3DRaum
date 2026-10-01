@@ -258,3 +258,83 @@ export function livingCollision() {
     design: { floor: 'herringbone', lighting: { preset: 'daylight', brightness: 1 } },
   }), version: 6 };
 }
+
+/**
+ * V1.1 Block C – Küche, Bad, Wohnzimmer mit Teppich (Format 7).
+ * Küche: Zeile an der Nordwand (Unterschränke, Spüle, Herd, Hochschrank, Kühlschrank),
+ * Oberschränke darüber, Kücheninsel. Bad: WC, Waschtisch, Dusche, Badewanne, Wandfliesen.
+ */
+export function kitchenScene() {
+  n = 0;
+  const walls = rectangleWalls(4.2, 3.6, 2.6);
+  return { ...project('kueche', 'Küche', {
+    walls,
+    openings: [
+      { id: 'opening-1', type: 'window', wall: 'east', offset: 1.2, width: 1.2, height: 1.2, sillHeight: 1.0, sashes: 1 },
+      { id: 'opening-2', type: 'door', wall: 'south', offset: 0.4, width: 0.9, height: 2.1, hinge: 'left', swing: 'inward' },
+    ],
+    furniture: [
+      item('fridge', 'Kühlschrank', 0.3, 0.33, 0, [0.6, 0.65, 2.0]),
+      item('kitchen-tall', 'Hochschrank', 0.9, 0.3, 0, [0.6, 0.6, 2.0]),
+      item('kitchen-base', 'Unterschrank 1', 1.5, 0.3, 0, [0.6, 0.6, 0.9]),
+      item('kitchen-sink', 'Spüle', 2.2, 0.3, 0, [0.8, 0.6, 0.9]),
+      item('kitchen-stove', 'Herd', 2.9, 0.3, 0, [0.6, 0.6, 0.9]),
+      item('kitchen-base', 'Unterschrank 2', 3.6, 0.3, 0, [0.6, 0.6, 0.9]),
+      item('kitchen-wall', 'Oberschrank 1', 1.5, 0.18, 0, [0.6, 0.35, 0.7], { elevation: 1.45 }),
+      item('kitchen-wall', 'Oberschrank 2', 2.2, 0.18, 0, [0.8, 0.35, 0.7], { elevation: 1.45 }),
+      item('kitchen-wall', 'Oberschrank 3', 3.6, 0.18, 0, [0.6, 0.35, 0.7], { elevation: 1.45 }),
+      item('kitchen-island', 'Kücheninsel', 2.3, 2.1, 0, [1.8, 0.9, 0.92]),
+      item('pendant-light', 'Pendelleuchte', 2.3, 2.1, 0, [0.35, 0.35, 0.8], { light: { on: true, intensity: 1, temperature: 3000 } }),
+    ],
+    design: {
+      floor: 'tiles-large-light',
+      wallFinishes: { north: 'tiles' },
+      lighting: { preset: 'neutral', brightness: 1 },
+    },
+  }), version: 7 };
+}
+
+export function bathScene() {
+  n = 0;
+  const walls = rectangleWalls(2.8, 2.4, 2.5);
+  return { ...project('bad', 'Bad', {
+    walls,
+    height: 2.5,
+    openings: [
+      { id: 'opening-1', type: 'door', wall: 'south', offset: 1.2, width: 0.8, height: 2.0, hinge: 'right', swing: 'inward' },
+      { id: 'opening-2', type: 'window', wall: 'north', offset: 1.0, width: 0.8, height: 0.9, sillHeight: 1.4, sashes: 1 },
+    ],
+    furniture: [
+      item('bathtub', 'Badewanne', 0.88, 0.38, 0, [1.7, 0.75, 0.6]),
+      item('shower', 'Dusche', 2.35, 0.45, 0, [0.9, 0.9, 2.0]),
+      item('toilet', 'WC', 0.35, 1.6, 90, [0.4, 0.7, 0.8]),
+      item('washbasin', 'Waschtisch', 2.55, 1.6, 270, [0.8, 0.5, 0.85]),
+      item('rug', 'Badvorleger', 1.4, 1.6, 0, [0.8, 0.5, 0.01], { colors: { fabric: '#9fb3c8' } }),
+      item('plant', 'Pflanze', 2.55, 2.2, 0, [0.3, 0.3, 0.5]),
+    ],
+    design: {
+      floor: 'tiles',
+      wallColors: Object.fromEntries(walls.map((w) => [w.id, '#f3f4f2'])),
+      wallFinishes: Object.fromEntries(walls.map((w) => [w.id, 'tiles'])),
+      lighting: { preset: 'daylight', brightness: 1 },
+    },
+  }), version: 7 };
+}
+
+export function livingRug() {
+  n = 0;
+  return { ...project('wohnen-teppich', 'Wohnzimmer Teppich', {
+    walls: rectangleWalls(5, 4.2, 2.6),
+    openings: [{ id: 'opening-1', type: 'window', wall: 'north', offset: 1.6, width: 1.8, height: 1.4, sillHeight: 0.8, sashes: 2 }],
+    furniture: [
+      item('rug', 'Teppich', 2.5, 2.6, 0, [2.4, 1.7, 0.01], { colors: { fabric: '#c9a77c' } }),
+      item('sofa', 'Sofa', 2.5, 3.6, 180, [2.2, 0.95, 0.85], { colors: { fabric: '#6b7f99' } }),
+      item('coffee-table', 'Couchtisch', 2.5, 2.5, 0, [1.1, 0.6, 0.45]),
+      item('armchair', 'Sessel', 0.9, 2.3, 90, [0.85, 0.85, 0.85]),
+      item('plant', 'Pflanze', 4.6, 3.8, 0, [0.5, 0.5, 1.3]),
+      item('floor-lamp', 'Stehlampe', 0.45, 3.75, 0, [0.4, 0.4, 1.6], { light: { on: true, intensity: 1, temperature: 2700 } }),
+      item('tv-board', 'TV-Board', 2.5, 0.25, 0, [1.8, 0.4, 0.5]),
+    ],
+    design: { floor: 'oak', lighting: { preset: 'warm', brightness: 1 } },
+  }), version: 7 };
+}

@@ -40,11 +40,16 @@ const CATALOG = {
 const TYPES = Object.keys(CATALOG);
 // Lampen (eigene Kategorie; eigene Tests in lamps.mjs)
 const LAMP_TYPES = ['ceiling-light', 'pendant-light', 'floor-lamp', 'table-lamp'];
-const ALL_TYPES = [...TYPES, ...LAMP_TYPES];
+// V1.1 Block C: Küche, Bad, Teppich, Pflanze (eigene Tests in kitchen-bath.mjs)
+const KITCHEN_TYPES = ['kitchen-base', 'kitchen-sink', 'kitchen-stove', 'kitchen-wall', 'kitchen-tall', 'fridge', 'kitchen-island'];
+const BATH_TYPES = ['toilet', 'washbasin', 'shower', 'bathtub'];
+const ALL_TYPES = [...TYPES, ...LAMP_TYPES, ...KITCHEN_TYPES, ...BATH_TYPES, 'rug', 'plant'];
 const CATEGORY_TYPES = {
-  living: ['sofa', 'armchair', 'coffee-table', 'tv-board', 'shelf'],
-  bedroom: ['bed', 'double-bed', 'wardrobe', 'dresser', 'nightstand'],
+  living: ['sofa', 'armchair', 'coffee-table', 'tv-board', 'shelf', 'rug', 'plant'],
+  bedroom: ['bed', 'double-bed', 'wardrobe', 'dresser', 'nightstand', 'rug'],
   dining: ['table', 'chair', 'sideboard'],
+  kitchen: KITCHEN_TYPES,
+  bath: BATH_TYPES,
   office: ['desk', 'office-chair', 'shelf'],
 };
 
@@ -87,16 +92,16 @@ await setIn(room, 'Breite', '12'); await setIn(room, 'Länge', '10'); await setI
 check('Sidebar: ein Button „Möbel hinzufügen“ statt Einzel-Buttons', (await page.getByTestId('furniture-library-button').textContent()).includes('Möbel hinzufügen') && (await page.locator('[data-testid^="add-furniture-"]').count()) === 0);
 await openLibrary();
 check('Bibliothek öffnet, Suchfeld hat den Fokus', (await lib.count()) === 1 && (await page.evaluate(() => document.activeElement?.dataset.testid)) === 'library-search');
-check('„Alle“: 19 Objekte (15 Möbel + 4 Lampen), jedes genau einmal (Regal trotz zwei Kategorien)', sameSet(await cardTypes(), ALL_TYPES) && (await cardTypes()).length === 19);
+check('„Alle“: 32 Objekte (28 Möbel + 4 Lampen), jedes genau einmal (Regal/Teppich trotz zwei Kategorien)', sameSet(await cardTypes(), ALL_TYPES) && (await cardTypes()).length === 32);
 for (const [id, types] of Object.entries(CATEGORY_TYPES)) {
   await lib.getByTestId(`library-category-${id}`).click(); await settle(80);
   const label = (await lib.getByTestId(`library-category-${id}`).textContent()).trim();
   check(`Kategorie ${label}: richtige Möbel`, sameSet(await cardTypes(), types) && (await lib.getByTestId(`library-category-${id}`).getAttribute('aria-selected')) === 'true', (await cardTypes()).join(','));
 }
-check('Kategorien mit Anzahl (Alle 19, Wohnzimmer 5, Schlafzimmer 5, Esszimmer 3, Büro 3, Lampen 4)',
-  JSON.stringify(await lib.locator('[role="tab"]').allTextContents()) === JSON.stringify(['Alle19', 'Wohnzimmer5', 'Schlafzimmer5', 'Esszimmer3', 'Büro3', 'Lampen4']));
+check('Kategorien mit Anzahl (Alle 32, Wohnzimmer 7, Schlafzimmer 6, Esszimmer 3, Küche 7, Bad 4, Büro 3, Lampen 4)',
+  JSON.stringify(await lib.locator('[role="tab"]').allTextContents()) === JSON.stringify(['Alle32', 'Wohnzimmer7', 'Schlafzimmer6', 'Esszimmer3', 'Küche7', 'Bad4', 'Büro3', 'Lampen4']));
 await lib.getByTestId('library-category-all').click();
-await page.waitForFunction(() => document.querySelectorAll('[data-testid="library-thumbnail"]').length === 19, null, { timeout: 20000 }).catch(() => {});
+await page.waitForFunction(() => document.querySelectorAll('[data-testid="library-thumbnail"]').length === 32, null, { timeout: 20000 }).catch(() => {});
 const thumbs = await lib.getByTestId('library-thumbnail').evaluateAll(async (imgs) => Promise.all(imgs.map(async (img) => {
   await img.decode().catch(() => {});
   const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
@@ -105,14 +110,14 @@ const thumbs = await lib.getByTestId('library-thumbnail').evaluateAll(async (img
   let filled = 0; for (let i = 3; i < data.length; i += 4) if (data[i] > 10) filled++;
   return { src: img.src.slice(0, 22), coverage: filled / (data.length / 4) };
 })));
-check('Jede Karte hat ein eigenes 3D-Vorschaubild (nicht leer)', thumbs.length === 19 && thumbs.every((t) => t.src === 'data:image/png;base64,' && t.coverage > 0.03), thumbs.map((t) => t.coverage.toFixed(2)).join(' '));
+check('Jede Karte hat ein eigenes 3D-Vorschaubild (nicht leer)', thumbs.length === 32 && thumbs.every((t) => t.src === 'data:image/png;base64,' && t.coverage > 0.03), thumbs.map((t) => t.coverage.toFixed(2)).join(' '));
 check('Karten zeigen Name und Standardmaße', (await lib.getByTestId('library-item-double-bed').textContent()).includes('Doppelbett') && (await lib.getByTestId('library-item-double-bed').textContent()).includes('2,10 × 1,80 × 0,50 m'));
 await shot('library-all');
 
 // ---------- 2. Suche ----------
 await lib.getByTestId('library-category-office').click();
 await search('Schrank');
-check('Suche „Schrank“: Kleiderschrank, TV-Board, Kommode, Nachttisch, Sideboard', sameSet(await cardTypes(), ['wardrobe', 'tv-board', 'dresser', 'nightstand', 'sideboard']), (await cardTypes()).join(','));
+check('Suche „Schrank“: Kleiderschrank, TV-Board, Kommode, Nachttisch, Sideboard, Küchenschränke, Kühlschrank, Waschtisch', sameSet(await cardTypes(), ['wardrobe', 'tv-board', 'dresser', 'nightstand', 'sideboard', 'kitchen-base', 'kitchen-sink', 'kitchen-wall', 'kitchen-tall', 'fridge', 'washbasin']), (await cardTypes()).join(','));
 check('Suche wechselt automatisch zu „Alle“', (await lib.getByTestId('library-category-all').getAttribute('aria-selected')) === 'true');
 await shot('library-search');
 await search('stuhl'); check('Suche „stuhl“: Stuhl und Bürostuhl', sameSet(await cardTypes(), ['chair', 'office-chair']));
@@ -123,7 +128,7 @@ await search('couch tisch'); check('Mehrere Wörter „couch tisch“: Couchtisc
 await search('Hängematte');
 check('Keine Treffer: verständlicher Hinweis', (await cardTypes()).length === 0 && (await lib.getByTestId('library-empty').textContent()).includes('Keine Möbel gefunden für „Hängematte“'));
 await search('');
-check('Suche leeren: wieder alle 19', (await cardTypes()).length === 19);
+check('Suche leeren: wieder alle 32', (await cardTypes()).length === 32);
 await page.keyboard.press('Escape'); await settle();
 check('Esc schließt die Bibliothek', (await lib.count()) === 0);
 

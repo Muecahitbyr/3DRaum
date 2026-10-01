@@ -44,10 +44,13 @@ function zoneCollider(item: FurnitureItem, zone: FurnitureZone, kind: 'furniture
  * erhöht bzw. auf ihrem Träger (`supportY`).
  */
 export function furnitureColliders(item: FurnitureItem, room: RoomModel, supportY?: number): Collider[] {
+  const zones = furnitureZones(item);
+  // Ohne Zonen (Teppich): auch keine Hülle – er liegt unter Möbeln und stört keinen Heizkörper.
+  if (zones.length === 0) return [];
   const center = furnitureToWorld(item.position, room);
   const baseY = furnitureBaseY(item, room.dimensions.height, supportY);
   return [
-    ...furnitureZones(item).map((zone) => zoneCollider(item, zone, 'furniture', center, baseY)),
+    ...zones.map((zone) => zoneCollider(item, zone, 'furniture', center, baseY)),
     zoneCollider(item, envelopeZone(item), 'furnitureEnvelope', center, baseY),
   ];
 }
