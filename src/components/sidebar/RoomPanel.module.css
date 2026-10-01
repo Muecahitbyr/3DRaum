@@ -41,3 +41,32 @@
   padding-inline: 6px;
   font-size: 12px;
 }
+
+.lShape {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Grundfläche und Umfang: zwei ruhige Kennzahlen nebeneinander. */
+.measurements {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.measurements dt {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.measurements dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

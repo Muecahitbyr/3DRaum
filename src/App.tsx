@@ -127,11 +127,15 @@ export function App() {
     if (!webgl || !capture.current) return null;
     const before = viewRef.current;
     const switching = before.viewMode !== '3d' || !before.preview;
+    // Ausgewählte Türen/Fenster/Raumobjekte sind blau eingefärbt (Material, kein Hilfselement):
+    // für die Aufnahme kurz abwählen, danach wieder auswählen (kein Verlaufsschritt).
+    const tinted = state.selection?.kind === 'opening' || state.selection?.kind === 'fixture' ? state.selection : null;
+    if (tinted) clearSelection();
     if (switching) {
       setViewMode('3d');
       setPreview(true);
-      await frames(8);
     }
+    if (switching || tinted) await frames(8);
     try {
       return capture.current?.capture(3200) ?? null;
     } finally {
@@ -139,6 +143,8 @@ export function App() {
         setViewMode(before.viewMode);
         setPreview(before.preview);
       }
+      if (tinted?.kind === 'opening') actions.selectOpening(tinted.id);
+      else if (tinted?.kind === 'fixture') actions.selectFixture(tinted.id);
     }
   };
   const runExport = async (kind: ExportKind): Promise<string> => {
@@ -237,6 +243,7 @@ export function App() {
             selectedCornerId={selectedCornerId}
             onDimensionChange={actions.setRoomDimension}
             onShapeChange={actions.setRoomShape}
+            onLShapeChange={actions.setLShapeDimensions}
             onToggleEditing={toggleRoomEditing}
             onWallLengthChange={actions.setWallLength}
             onWallThicknessChange={actions.setWallThickness}

@@ -11,6 +11,8 @@ import { useOpeningDrag } from '../../interaction/OpeningDragProvider';
 import type { RoomVariant } from '../Room';
 import { DoorModel } from './DoorModel';
 import { DoorPlanSymbol } from './DoorPlanSymbol';
+import { PassageModel } from './PassageModel';
+import { PassagePlanSymbol } from './PassagePlanSymbol';
 import { WindowModel } from './WindowModel';
 import { WindowPlanSymbol } from './WindowPlanSymbol';
 
@@ -34,7 +36,7 @@ interface OpeningElementProps extends OpeningPartProps {
 }
 
 /**
- * Tür oder Fenster im lokalen Wand-Koordinatensystem. Kümmert sich um Auswahl und
+ * Tür, Fenster oder Durchgang im lokalen Wand-Koordinatensystem. Kümmert sich um Auswahl und
  * Hover; die eigentliche Darstellung übernehmen die Modell- bzw. Grundriss-Komponenten.
  */
 export function OpeningElement({ opening, variant, onSelect, interactive = true, ...partProps }: OpeningElementProps) {
@@ -70,7 +72,7 @@ export function OpeningElement({ opening, variant, onSelect, interactive = true,
       userData={{
         openingId: opening.id,
         openingType: opening.type,
-        ...(opening.type === 'door' ? { hinge: opening.hinge, swing: opening.swing } : { sashes: opening.sashes }),
+        ...(opening.type === 'door' ? { hinge: opening.hinge, swing: opening.swing } : opening.type === 'window' ? { sashes: opening.sashes } : {}),
       }}
       onClick={interactive ? handleClick : undefined}
       onPointerDown={interactive ? handlePointerDown : undefined}
@@ -84,12 +86,14 @@ export function OpeningElement({ opening, variant, onSelect, interactive = true,
       }
       onPointerOut={interactive ? () => setHovered(false) : undefined}
     >
-      {isPlan ? (
-        opening.type === 'door' ? <DoorPlanSymbol {...partProps} /> : <WindowPlanSymbol {...partProps} sashes={opening.sashes} />
-      ) : opening.type === 'door' ? (
-        <DoorModel {...partProps} />
+      {opening.type === 'door' ? (
+        isPlan ? <DoorPlanSymbol {...partProps} /> : <DoorModel {...partProps} />
+      ) : opening.type === 'window' ? (
+        isPlan ? <WindowPlanSymbol {...partProps} sashes={opening.sashes} /> : <WindowModel {...partProps} sashes={opening.sashes} />
+      ) : isPlan ? (
+        <PassagePlanSymbol {...partProps} />
       ) : (
-        <WindowModel {...partProps} sashes={opening.sashes} />
+        <PassageModel {...partProps} />
       )}
       <HitArea span={span} wall={wall} plan={isPlan} door={isDoor} raised={partProps.selected} />
     </group>

@@ -61,7 +61,8 @@ export function getOpeningLimits(opening: Opening, room: RoomModel): OpeningLimi
   const width = limit(Math.min(limits.width[0], wallLength), Math.min(limits.width[1], wallLength));
   const offset = limit(0, wallLength - opening.width);
 
-  if (opening.type === 'door') {
+  // Tür und Durchgang stehen auf dem Boden (keine Brüstung).
+  if (opening.type !== 'window') {
     return {
       offset,
       width,
@@ -105,7 +106,7 @@ export function normalizeOpening(opening: Opening, room: RoomModel): Opening {
   const offset = fit(opening.offset, { min: 0, max: floorCm(wallLength - width) });
   const minHeight = Math.min(limits.height[0], wallHeight);
 
-  if (opening.type === 'door') {
+  if (opening.type !== 'window') {
     const height = fit(opening.height, { min: minHeight, max: Math.min(limits.height[1], wallHeight) });
     return { ...opening, width, offset, height };
   }
@@ -189,7 +190,11 @@ export function createOpening(
 
   const base = { id, wall: wall.id, offset, width, height };
   const opening: Opening =
-    type === 'door' ? { ...base, type, hinge: defaultDoorHinge(wall), swing: 'inward' } : { ...base, type, sillHeight, sashes: 1 };
+    type === 'door'
+      ? { ...base, type, hinge: defaultDoorHinge(wall), swing: 'inward' }
+      : type === 'window'
+        ? { ...base, type, sillHeight, sashes: 1 }
+        : { ...base, type };
   return normalizeOpening(opening, room);
 }
 

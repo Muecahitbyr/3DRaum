@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const E2E_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(E2E_DIR);
@@ -26,10 +26,14 @@ const SUITE_TIMEOUT_MS = 10 * 60 * 1000;
 /** Reihenfolge = Ausführungsreihenfolge. `server`: gegen welchen Server die Suite läuft. */
 const SUITES = [
   { file: 'unit/collision-geometry.test.ts', name: 'Kollisionsgeometrie (Unit)', server: null },
+  { file: 'unit/room-measurements.test.ts', name: 'Raummaße & Maßketten (Unit)', server: null },
+  { file: 'unit/l-shape.test.ts', name: 'L-Form (Unit)', server: null },
+  { file: 'unit/openings.test.ts', name: 'Öffnungen, Durchgang & Format 6 (Unit)', server: null },
   { file: 'suites/room-geometry.mjs', name: 'Raumgeometrie (Unit, Dev-Module)', server: 'dev' },
   { file: 'suites/room-views.mjs', name: 'Raum, 2D/3D (Produktions-Build)', server: 'preview' },
   { file: 'suites/openings.mjs', name: 'Türen & Fenster', server: 'dev' },
   { file: 'suites/openings-drag.mjs', name: 'Drag & Drop Türen/Fenster', server: 'dev' },
+  { file: 'suites/measurements.mjs', name: 'Maße, Durchgang & L-Form', server: 'dev' },
   { file: 'suites/furniture.mjs', name: 'Möbel', server: 'dev' },
   { file: 'suites/furniture-drag.mjs', name: 'Drag & Drop Möbel', server: 'dev' },
   { file: 'suites/collision.mjs', name: 'Kollisionen', server: 'dev' },
@@ -51,7 +55,7 @@ const SUITES = [
   { file: 'suites/mobile.mjs', name: 'Mobile, Tablet & Touch', server: 'dev' },
   { file: 'suites/robustness.mjs', name: 'Fehlerbehandlung & Robustheit', server: 'dev' },
   { file: 'suites/accessibility.mjs', name: 'Accessibility', server: 'dev' },
-  { file: 'suites/migrations.mjs', name: 'Speicherkompatibilität (Format 1–5)', server: 'dev' },
+  { file: 'suites/migrations.mjs', name: 'Speicherkompatibilität (Format 1–6)', server: 'dev' },
   { file: 'suites/visual-final.mjs', name: 'Visuelle Endabnahme (5 Projekte × 3 Geräte)', server: 'dev' },
 ];
 
@@ -208,7 +212,8 @@ for (const suite of selected) {
   const failures = [];
   let tally = null;
   const suiteStart = Date.now();
-  const nodeArgs = suite.file.endsWith('.ts') ? ['--experimental-strip-types', '--no-warnings'] : [];
+  // Unit-Tests: TypeScript direkt in Node; der Resolve-Hook löst Importe ohne Dateiendung auf (wie Vite).
+  const nodeArgs = suite.file.endsWith('.ts') ? ['--experimental-strip-types', '--no-warnings', '--import', pathToFileURL(path.join(E2E_DIR, 'unit', 'ts-resolve.mjs')).href] : [];
   const code = await runProcess(
     process.execPath,
     [...nodeArgs, path.join(E2E_DIR, suite.file)],

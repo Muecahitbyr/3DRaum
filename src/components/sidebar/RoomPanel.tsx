@@ -1,6 +1,8 @@
 import { ROOM_DIMENSION_CONSTRAINTS, ROOM_DIMENSION_KEYS, ROOM_LIMITS, ROOM_SHAPE_LABELS } from '../../config/room';
 import type { Meters, RoomDimensionKey, RoomShape } from '../../types/room';
+import { roomMeasurements } from '../../utils/room/measurements';
 import type { RoomModel } from '../../utils/room/model';
+import { lShapeCutLimits, lShapeDimensionsOf, type LShapeDimensions } from '../../utils/room/plan';
 import { formatMeters } from '../../utils/units';
 import { Button } from '../ui/Button';
 import { ChoiceField } from '../ui/ChoiceField';
@@ -20,6 +22,8 @@ interface RoomPanelProps {
   selectedCornerId: string | null;
   onDimensionChange: (key: RoomDimensionKey, value: Meters) => void;
   onShapeChange: (shape: RoomShape) => void;
+  /** Hauptmaße einer (noch nicht frei bearbeiteten) L-Form. */
+  onLShapeChange: (dimensions: Partial<LShapeDimensions>) => void;
   onToggleEditing: () => void;
   onWallLengthChange: (wallId: string, length: Meters) => void;
   onWallThicknessChange: (wallId: string, thickness: Meters) => void;
@@ -40,6 +44,7 @@ export function RoomPanel({
   selectedCornerId,
   onDimensionChange,
   onShapeChange,
+  onLShapeChange,
   onToggleEditing,
   onWallLengthChange,
   onWallThicknessChange,
@@ -50,6 +55,9 @@ export function RoomPanel({
 }: RoomPanelProps) {
   const rectangle = room.plan.shape === 'rectangle' && room.isRectangle;
   const keys = rectangle ? ROOM_DIMENSION_KEYS : (['height'] as const);
+  const lShape = lShapeDimensionsOf(room.plan);
+  const cutLimits = lShape ? lShapeCutLimits(lShape.width, lShape.length) : null;
+  const { area, perimeter } = roomMeasurements(room);
   const wall = selectedWallId ? room.wallById.get(selectedWallId) : undefined;
   const corner = selectedCornerId ? room.wallById.get(selectedCornerId) : undefined;
   const canRemove = room.walls.length > ROOM_LIMITS.minWalls;
@@ -70,11 +78,60 @@ export function RoomPanel({
           />
         );
       })}
+      {lShape && cutLimits && (
+        <div className={styles.lShape} data-testid="l-shape-dimensions">
+          <div className={styles.row}>
+            <MeasurementInput
+              label="Gesamtbreite"
+              value={lShape.width}
+              min={ROOM_DIMENSION_CONSTRAINTS.width.min}
+              max={ROOM_DIMENSION_CONSTRAINTS.width.max}
+              step={ROOM_DIMENSION_CONSTRAINTS.width.step}
+              onChange={(width) => onLShapeChange({ width })}
+            />
+            <MeasurementInput
+              label="Gesamtlänge"
+              value={lShape.length}
+              min={ROOM_DIMENSION_CONSTRAINTS.length.min}
+              max={ROOM_DIMENSION_CONSTRAINTS.length.max}
+              step={ROOM_DIMENSION_CONSTRAINTS.length.step}
+              onChange={(length) => onLShapeChange({ length })}
+            />
+          </div>
+          <div className={styles.row}>
+            <MeasurementInput
+              label="Ausschnitt Breite"
+              value={lShape.cutWidth}
+              {...cutLimits.cutWidth}
+              step={0.05}
+              onChange={(cutWidth) => onLShapeChange({ cutWidth })}
+            />
+            <MeasurementInput
+              label="Ausschnitt Länge"
+              value={lShape.cutLength}
+              {...cutLimits.cutLength}
+              step={0.05}
+              onChange={(cutLength) => onLShapeChange({ cutLength })}
+            />
+          </div>
+          <p className={styles.hint}>Ausschnitt rechts unten. Danach weiter frei im Grundriss-Editor bearbeitbar.</p>
+        </div>
+      )}
       {!rectangle && (
         <p className={styles.info} data-testid="room-summary">
           {room.walls.length} Wände · Umriss {formatMeters(room.dimensions.width)} × {formatMeters(room.dimensions.length)} m
         </p>
       )}
+      <dl className={styles.measurements} data-testid="room-measurements">
+        <div>
+          <dt>Grundfläche</dt>
+          <dd data-testid="room-area">{formatMeters(area)} m²</dd>
+        </div>
+        <div>
+          <dt>Umfang</dt>
+          <dd data-testid="room-perimeter">{formatMeters(perimeter)} m</dd>
+        </div>
+      </dl>
 
       <ChoiceField<RoomShape>
         label="Raumform"

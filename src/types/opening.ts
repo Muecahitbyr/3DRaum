@@ -1,6 +1,6 @@
 import type { Meters } from './room';
 
-export type OpeningType = 'door' | 'window';
+export type OpeningType = 'door' | 'window' | 'passage';
 
 /**
  * Gemeinsame Felder aller Wandöffnungen. Öffnungen werden als flache Liste
@@ -38,7 +38,12 @@ export interface WindowOpening extends OpeningBase {
   sashes: 1 | 2;
 }
 
-export type Opening = DoorOpening | WindowOpening;
+/** Durchgang: echte Wandöffnung ohne Türblatt, Anschlag und Schwenkbereich (z. B. offene Küche). */
+export interface PassageOpening extends OpeningBase {
+  type: 'passage';
+}
+
+export type Opening = DoorOpening | WindowOpening | PassageOpening;
 
 /** Bearbeitbare Felder (Typ und ID sind fix). */
 export type OpeningPatch = Partial<Omit<DoorOpening, 'id' | 'type'>> &

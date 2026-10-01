@@ -1,9 +1,11 @@
 import { FURNITURE_CATALOG } from '../config/furniture';
-import { OPENING_TYPE_LABELS } from '../config/openings';
 import { ROOM_SHAPE_LABELS } from '../config/room';
 import { LIGHTING_PRESETS, FLOOR_MATERIALS } from '../config/design';
 import type { PlanDocument } from '../state/history';
-import { signedArea } from '../utils/polygon';
+import type { Opening } from '../types/opening';
+import type { WallSegment } from '../types/room';
+import { getOpeningDisplayName } from '../utils/openingLabels';
+import { readingDistances, readingSides, roomMeasurements } from '../utils/room/measurements';
 import type { RoomModel } from '../utils/room/model';
 import { formatNumber } from '../utils/units';
 import { A4, canvasToPdfImage, fitText, PdfDocument, type PdfPage } from './pdf';
@@ -23,6 +25,7 @@ interface ReportInput {
 }
 
 const m = (v: number) => `${formatNumber(v, 2)} m`;
+const count = (openings: readonly Opening[], type: Opening['type']) => openings.filter((o) => o.type === type).length;
 const cm = (v: number) => formatNumber(Math.round(v * 100), 0);
 
 /**
@@ -42,15 +45,15 @@ export async function buildReport(input: ReportInput): Promise<Blob> {
   let y = 104;
   page.text(MARGIN, y, 'Raumdaten', 12, true);
   y += 20;
-  const area = Math.abs(signedArea(room.polygon));
-  const perimeter = room.walls.reduce((sum, w) => sum + w.length, 0);
+  const { area, perimeter } = roomMeasurements(room);
   const facts: [string, string][] = [
     ['Raumform', `${ROOM_SHAPE_LABELS[room.plan.shape]} · ${room.walls.length} Wände`],
     ['Grundfläche', `${formatNumber(area, 2)} m²`],
     ['Umriss (Hülle)', `${m(room.dimensions.width)} × ${m(room.dimensions.length)}`],
     ['Raumhöhe', m(room.dimensions.height)],
-    ['Wandlängen gesamt', m(perimeter)],
-    ['Türen / Fenster', `${plan.openings.filter((o) => o.type === 'door').length} / ${plan.openings.filter((o) => o.type === 'window').length}`],
+    ['Umfang', m(perimeter)],
+    ['Türen / Fenster', `${count(plan.openings, 'door')} / ${count(plan.openings, 'window')}`],
+    ['Durchgänge', String(count(plan.openings, 'passage'))],
     ['Boden', FLOOR_MATERIALS[plan.design.floor].label],
     ['Licht', `${LIGHTING_PRESETS[plan.design.lighting.preset].label}, ${Math.round(plan.design.lighting.brightness * 100)} %`],
   ];
@@ -115,30 +118,67 @@ export async function buildReport(input: ReportInput): Promise<Blob> {
   }
   if (plan.openings.length) {
     y += 14;
-    if (y > A4.height - MARGIN - 60) {
+    const openingColumns = [
+      { title: 'Bauteil', x: 0, w: 62 },
+      { title: 'Wand', x: 62, w: 80 },
+      { title: 'Lage (Abstand zur Wandecke)', x: 142, w: 148 },
+      { title: 'B × H (cm)', x: 290, w: 50 },
+      { title: 'Brüstung', x: 340, w: 44 },
+      { title: 'Ausführung', x: 384, w: width - 384 },
+    ];
+    const openingHeader = () => {
+      page.rect(MARGIN, y - 4, width, 18, { fill: [0.95, 0.96, 0.97] });
+      openingColumns.forEach((c) => page.text(MARGIN + c.x + 4, y, c.title, 8.5, true, MUTED));
+      y += 20;
+    };
+    const newPage = () => {
       footer(page, pageNumber);
       page = pdf.addPage();
       pageNumber++;
       header(page, input);
       y = 104;
-    }
-    page.text(MARGIN, y, 'Türen und Fenster', 12, true);
-    y += 18;
-    const counts = new Map<string, number>();
+    };
+    if (y > A4.height - MARGIN - 80) newPage();
+    page.text(MARGIN, y, `Türen, Fenster und Durchgänge (${plan.openings.length})`, 12, true);
+    y += 20;
+    openingHeader();
     for (const o of plan.openings) {
-      const n = (counts.get(o.type) ?? 0) + 1;
-      counts.set(o.type, n);
+      if (y > A4.height - MARGIN - 30) {
+        newPage();
+        openingHeader();
+      }
       const wall = room.wallById.get(o.wall);
-      const detail = o.type === 'window' ? `Brüstung ${cm(o.sillHeight)} cm` : `Anschlag ${o.hinge === 'left' ? 'links' : 'rechts'}, öffnet nach ${o.swing === 'inward' ? 'innen' : 'außen'}`;
-      page.text(MARGIN + 4, y, fitText(`${OPENING_TYPE_LABELS[o.type]} ${n} · ${wall?.label ?? ''} · ${cm(o.width)} × ${cm(o.height)} cm · ${detail}`, 9, width - 8), 9);
-      y += 15;
-      if (y > A4.height - MARGIN - 20) break;
+      const cells = [
+        getOpeningDisplayName(o, plan.openings),
+        wall?.label ?? '–',
+        wall ? openingPosition(wall, o) : '–',
+        `${cm(o.width)} × ${cm(o.height)}`,
+        o.type === 'window' ? `${cm(o.sillHeight)} cm` : '–',
+        openingDetails(o),
+      ];
+      cells.forEach((text, i) => page.text(MARGIN + openingColumns[i].x + 4, y, fitText(text, 9, openingColumns[i].w - 8), 9));
+      page.line(MARGIN, y + 13, MARGIN + width, y + 13, [0.9, 0.91, 0.93], 0.5);
+      y += 17;
     }
+    page.text(MARGIN + 4, y + 2, 'Lage: Abstand der Öffnungskante zur Wandecke, gemessen entlang der Wand-Innenseite (lichte Maße).', 7.5, false, MUTED);
   }
   footer(page, pageNumber);
 
   const bytes = pdf.build();
   return new Blob([bytes as BlobPart], { type: 'application/pdf' });
+}
+
+/** Verständliche Lage in Grundriss-Leserichtung, z. B. „0,80 m von links (rechts 3,30 m)“. */
+function openingPosition(wall: WallSegment, opening: Opening): string {
+  const sides = readingSides(wall);
+  const d = readingDistances(wall, opening);
+  return `${m(d.start)} von ${sides.start} (${sides.end} ${m(d.end)})`;
+}
+
+function openingDetails(opening: Opening): string {
+  if (opening.type === 'door') return `Anschlag ${opening.hinge === 'left' ? 'links' : 'rechts'}, nach ${opening.swing === 'inward' ? 'innen' : 'außen'}`;
+  if (opening.type === 'window') return opening.sashes === 2 ? 'zweiflügelig' : 'einflügelig';
+  return 'ohne Tür';
 }
 
 function header(page: PdfPage, input: ReportInput) {

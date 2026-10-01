@@ -21,17 +21,21 @@ import { alignmentDelta, clampFormationDelta, moveFormation, nextCopyName, type 
 import { createOpening, normalizeOpening } from '../utils/openings';
 import { roomModelOf, type RoomModel } from '../utils/room/model';
 import {
+  clampLShape,
   createRectangleRoom,
   createRoomForShape,
+  lShapeDimensionsOf,
   moveCorner,
   normalizeRoomPlan,
   removeCorner,
   removeWall,
+  resizeLShape,
   resizeRectangle,
   setRoomHeight,
   setWallLength,
   setWallThickness,
   splitWall,
+  type LShapeDimensions,
   type RoomEdit,
 } from '../utils/room/plan';
 import { remapWallItem } from '../utils/room/remap';
@@ -90,6 +94,8 @@ export interface FurnitureClipboard {
 export type PlannerAction =
   | { type: 'setRoomDimension'; key: RoomDimensionKey; value: Meters }
   | { type: 'setRoomShape'; shape: RoomShape }
+  /** Hauptmaße einer (unveränderten) L-Form. */
+  | { type: 'setLShapeDimensions'; dimensions: Partial<LShapeDimensions> }
   | { type: 'moveCorner'; wallId: string; point: FloorPoint }
   | { type: 'setWallLength'; wallId: string; length: Meters }
   | { type: 'setWallThickness'; wallId: string; thickness: Meters }
@@ -287,6 +293,14 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
         selection: null,
         layoutToken: state.layoutToken + 1,
       };
+    }
+
+    case 'setLShapeDimensions': {
+      const current = lShapeDimensionsOf(state.room);
+      if (!current) return state;
+      const next = clampLShape({ ...current, ...action.dimensions }, ROOM_DIMENSION_CONSTRAINTS.width);
+      if (sameValues(next, current)) return state;
+      return applyRoom(state, resizeLShape(state.room, next));
     }
 
     case 'moveCorner':

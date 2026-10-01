@@ -1,6 +1,7 @@
-import { OPENING_INPUT_STEP } from '../../config/openings';
+import { OPENING_INPUT_STEP, OPENING_TYPE_LABELS } from '../../config/openings';
 import type { DoorHinge, DoorSwing, Opening, OpeningPatch } from '../../types/opening';
-import { offsetFromReading, readingLabel, readingOffset, type RoomModel } from '../../utils/room/model';
+import { offsetForReadingDistance, readingDistances, readingSides } from '../../utils/room/measurements';
+import { offsetFromReading, readingOffset, type RoomModel } from '../../utils/room/model';
 import { getOpeningDisplayName } from '../../utils/openingLabels';
 import type { CollisionMessage } from '../../collision';
 import { getOpeningLimits } from '../../utils/openings';
@@ -80,15 +81,20 @@ export function OpeningPropertiesPanel({
 
       <SelectField<string> label="Wand" value={opening.wall} options={wallOptions} onChange={changeWall} />
 
+      {/* Lagemaße zu beiden Wandecken (Grundriss-Leserichtung); intern bleibt es eine Position ab Wandanfang. */}
       {wall && (
-        <MeasurementInput
-          key={`${opening.id}-offset-${opening.wall}`}
-          label={readingLabel(wall)}
-          value={readingOffset(wall, opening.offset, opening.width)}
-          {...limits.offset}
-          step={OPENING_INPUT_STEP}
-          onChange={(value) => update({ offset: offsetFromReading(wall, value, opening.width) })}
-        />
+        <div className={styles.positionRow}>
+          {(['start', 'end'] as const).map((side) => (
+            <MeasurementInput
+              key={`${opening.id}-${side}-${opening.wall}`}
+              label={`Abstand von ${readingSides(wall)[side]}`}
+              value={readingDistances(wall, opening)[side]}
+              {...limits.offset}
+              step={OPENING_INPUT_STEP}
+              onChange={(value) => update({ offset: offsetForReadingDistance(wall, opening.width, side, value) })}
+            />
+          ))}
+        </div>
       )}
 
       <div className={styles.row}>
@@ -129,6 +135,7 @@ export function OpeningPropertiesPanel({
         </div>
       )}
       {opening.type === 'door' && <p className={styles.hint}>Anschlag vom Raum aus auf die Wand gesehen.</p>}
+      {opening.type === 'passage' && <p className={styles.hint}>Wandöffnung ohne Tür, z. B. zur offenen Küche.</p>}
 
       {opening.type === 'window' && (
         <ChoiceField<'1' | '2'>
@@ -155,7 +162,7 @@ export function OpeningPropertiesPanel({
 
       <div className={styles.footer}>
         <Button variant="danger" block onClick={() => onDelete(opening.id)} data-testid="delete-opening">
-          {opening.type === 'door' ? 'Tür' : 'Fenster'} löschen
+          {OPENING_TYPE_LABELS[opening.type]} löschen
         </Button>
       </div>
     </SidebarSection>

@@ -299,7 +299,7 @@ await page.getByTestId('project-save').click(); await settle();
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').fill('Gruppen');
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').press('Enter'); await settle(200);
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
-check('Gruppe gespeichert (Version 5)', stored.version === 5 && stored.plan.groups.length === 1 && stored.plan.groups[0].memberIds.length === 2, JSON.stringify(stored.plan.groups));
+check('Gruppe gespeichert (Version 6)', stored.version === 6 && stored.plan.groups.length === 1 && stored.plan.groups[0].memberIds.length === 2, JSON.stringify(stored.plan.groups));
 await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
 await page.getByTestId('projects-button').click(); await settle();
 await page.getByTestId('project-item').filter({ hasText: 'Gruppen' }).getByTestId('project-open').click(); await settle(600);

@@ -108,7 +108,8 @@ function nextNumber(items: readonly { id: string }[], prefix: string): number {
 
 const pushPast = (past: HistoryEntry[], entry: HistoryEntry) => [...past, entry].slice(-HISTORY_LIMIT);
 
-const OPENING_NAMES = { door: 'Tür', window: 'Fenster' } as const;
+const OPENING_NAMES = { door: 'Tür', window: 'Fenster', passage: 'Durchgang' } as const;
+const OPENING_SIZE_LABELS = { door: 'Türmaße ändern', window: 'Fenstermaße ändern', passage: 'Durchgangsmaße ändern' } as const;
 
 function openingPatchLabel(opening: Opening | undefined, patch: OpeningPatch): string {
   const kind = opening ? OPENING_NAMES[opening.type] : 'Element';
@@ -117,7 +118,7 @@ function openingPatchLabel(opening: Opening | undefined, patch: OpeningPatch): s
   if ('hinge' in patch) return 'Türanschlag ändern';
   if ('swing' in patch) return 'Öffnungsrichtung ändern';
   if ('sashes' in patch) return 'Fensterart ändern';
-  return `${kind}maße ändern`;
+  return opening ? OPENING_SIZE_LABELS[opening.type] : 'Elementmaße ändern';
 }
 
 function fixturePatchLabel(label: string, patch: FixturePatch): string {
@@ -142,6 +143,8 @@ export function describeAction(action: PlannerAction, state: PlannerState): stri
       return 'Raummaße ändern';
     case 'setRoomShape':
       return 'Raumform ändern';
+    case 'setLShapeDimensions':
+      return 'Raummaße ändern';
     case 'moveCorner':
       return 'Ecke verschieben';
     case 'setWallLength':

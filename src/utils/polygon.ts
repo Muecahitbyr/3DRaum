@@ -37,6 +37,16 @@ export function signedArea(polygon: readonly FloorPoint[]): number {
   return sum / 2;
 }
 
+/** Fläche eines einfachen (nicht selbstüberschneidenden) Polygons, unabhängig von der Umlaufrichtung. */
+export const polygonArea = (polygon: readonly FloorPoint[]): number => Math.abs(signedArea(polygon));
+
+/** Umfang eines geschlossenen Polygons (Summe aller Kantenlängen inkl. Schlusskante). */
+export function polygonPerimeter(polygon: readonly FloorPoint[]): number {
+  let sum = 0;
+  for (let i = 0; i < polygon.length; i++) sum += distance(polygon[i], polygon[(i + 1) % polygon.length]);
+  return sum;
+}
+
 export interface Bounds {
   minX: number;
   maxX: number;

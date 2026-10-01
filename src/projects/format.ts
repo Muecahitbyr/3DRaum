@@ -39,11 +39,13 @@ export const PROJECT_FORMAT = 'raumplaner-project';
  * - 5: Gestaltung erweitert (Wandoberflächen, Deckenfarbe, Lichtstimmung + Helligkeit,
  *      neue Bodenbeläge); Möbel mit Farben (`colors`), Lampen mit Licht (`light`),
  *      Tischlampen mit Standhöhe (`elevation`).
+ * - 6: neue Öffnungsart „Durchgang“ (`type: 'passage'`: Wand, Position, Breite, Höhe).
+ *      Bestehende Daten bleiben unverändert.
  */
-export const PROJECT_FORMAT_VERSION = 5;
+export const PROJECT_FORMAT_VERSION = 6;
 
 /**
- * Gespeichertes Projekt (Version 1). Enthält nur den Plan – keine Auswahl,
+ * Gespeichertes Projekt. Enthält nur den Plan – keine Auswahl,
  * Kamera, Ansicht oder sonstigen UI-Zustände.
  */
 export interface ProjectFile {
@@ -136,6 +138,8 @@ const MIGRATIONS: Record<number, (data: Record<string, unknown>) => Record<strin
       plan: { ...data.plan, design: { ...design, wallFinishes: {}, ceilingColor: DEFAULT_CEILING_COLOR, lighting: LEGACY_LIGHTING } },
     };
   },
+  // 5 → 6: nur neue Öffnungsart (Durchgang) – Türen, Fenster und Geometrie bleiben exakt gleich.
+  5: (data) => ({ ...data, version: 6 }),
 };
 
 export function cleanProjectName(name: unknown): string {
@@ -271,11 +275,12 @@ const openingDefaults = { invalid: 0 };
 function readOpening(value: unknown, room: RoomModel): Opening | null {
   if (!isObject(value) || !nonEmptyString(value.id)) return null;
   const { type, wall } = value;
-  if (type !== 'door' && type !== 'window') return null;
+  if (type !== 'door' && type !== 'window' && type !== 'passage') return null;
   const segment = typeof wall === 'string' ? room.wallById.get(wall) : undefined;
   if (!segment) return null;
   if (!finite(value.offset) || !finite(value.width) || !finite(value.height)) return null;
   const base = { id: value.id, wall: segment.id, offset: value.offset, width: value.width, height: value.height };
+  if (type === 'passage') return normalizeOpening({ ...base, type }, room);
   if (type === 'door') {
     const hinge = value.hinge === 'left' || value.hinge === 'right' ? value.hinge : null;
     const swing = value.swing === 'inward' || value.swing === 'outward' ? value.swing : null;

@@ -13,7 +13,17 @@
   user-select: none;
 }
 
-.vertical {
+/* Öffnungsmaßkette: kleiner und ohne Rahmen – optisch unter dem Gesamtmaß. */
+.chainLabel {
   display: inline-block;
-  transform: rotate(-90deg);
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  white-space: nowrap;
+  user-select: none;
 }

@@ -41,6 +41,7 @@ export function openingColliders(opening: Opening, room: RoomModel): Collider[] 
   const along: [Meters, Meters] = [opening.offset, opening.offset + opening.width];
 
   // Lage in der Wand – für Überschneidungen zwischen Öffnungen (höhenunabhängig).
+  // Ein Durchgang hat nur diese Spanne: kein Türblatt, kein Schwenkbereich, keine Fensterzone.
   const colliders: Collider[] = [
     { kind: 'openingSpan', owner, footprint: wallRectangle(frame, along, [-wallThickness, 0]), height: ANY_HEIGHT },
   ];
@@ -66,7 +67,7 @@ export function openingColliders(opening: Opening, room: RoomModel): Collider[] 
       ),
       height: { min: 0, max: opening.height },
     });
-  } else {
+  } else if (opening.type === 'window') {
     // Zone direkt vor dem Fenster, nur im Höhenbereich der Fensteröffnung.
     colliders.push({
       kind: 'windowZone',

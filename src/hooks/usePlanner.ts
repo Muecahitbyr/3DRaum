@@ -15,6 +15,7 @@ import type { OpeningPatch, OpeningType } from '../types/opening';
 import type { FloorPoint, Meters, RoomDimensionKey, RoomShape } from '../types/room';
 import { roomModelOf } from '../utils/room/model';
 import type { AlignMode } from '../utils/furnitureFormation';
+import type { LShapeDimensions } from '../utils/room/plan';
 
 /** Planungszustand mit Verlauf + stabile Aktionen für Komponenten. */
 export function usePlanner() {
@@ -27,6 +28,8 @@ export function usePlanner() {
         dispatch({ type: 'setRoomDimension', key, value }),
       /** Neuen Raum der gewählten Form anlegen (Vorlage). */
       setRoomShape: (shape: RoomShape) => dispatch({ type: 'setRoomShape', shape }),
+      /** Hauptmaße der L-Form (Gesamtbreite/-länge, Ausschnitt). */
+      setLShapeDimensions: (dimensions: Partial<LShapeDimensions>) => dispatch({ type: 'setLShapeDimensions', dimensions }),
       /** Ecke am Anfang der Wand verschieben (Grundrisskoordinaten). */
       moveCorner: (wallId: string, point: FloorPoint) => dispatch({ type: 'moveCorner', wallId, point }),
       setWallLength: (wallId: string, length: Meters) => dispatch({ type: 'setWallLength', wallId, length }),

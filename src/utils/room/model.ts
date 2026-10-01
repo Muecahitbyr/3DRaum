@@ -146,7 +146,7 @@ export function wallPoint(wall: WallSegment, along: Meters, into: Meters): Floor
  * Umrechnung zwischen gespeicherter Position (ab Wandanfang) und angezeigter Position
  * („von links“ bzw. „von oben“ im Grundriss) – beide bis zur jeweils näheren Kante.
  */
-export function readingOffset(wall: WallSegment, offset: Meters, width: Meters): Meters {
+export function readingOffset(wall: Pick<WallSegment, 'length' | 'readingReversed'>, offset: Meters, width: Meters): Meters {
   return wall.readingReversed ? wall.length - offset - width : offset;
 }
 export const offsetFromReading = readingOffset;

@@ -7,20 +7,42 @@ import styles from './DimensionLine.module.css';
 
 type Point3 = [number, number, number];
 
+/**
+ * Lesbarer Drehwinkel (Grad, Bildschirm) für Text entlang einer Linie in der Draufsicht:
+ * Norden oben, x nach rechts, z nach unten. Ergebnis in [−90°, 90°) – nie auf dem Kopf;
+ * senkrechte Maße lesen sich von unten nach oben (−90°), waagerechte bleiben bei 0°.
+ */
+export function readableAngleDeg(start: FloorPoint, end: FloorPoint): number {
+  let angle = (Math.atan2(end.z - start.z, end.x - start.x) * 180) / Math.PI;
+  if (angle >= 90 - 1e-9) angle -= 180;
+  if (angle < -90 - 1e-9) angle += 180;
+  return Math.abs(angle) < 1e-9 ? 0 : angle;
+}
+
+/** Wrapper-Stil für gedrehte Beschriftungen (keiner bei waagerechten Maßen). */
+export const rotatedStyle = (angle: number) => (angle === 0 ? undefined : { display: 'inline-block', transform: `rotate(${angle}deg)` });
+
+const HTML_STYLE = { pointerEvents: 'none' } as const;
+
 interface DimensionLineProps {
   dimension: WallDimension;
   /** Höhe (y), auf der die Maßlinie gezeichnet wird. */
   elevation: Meters;
   /** Umrechnung Bildschirmpixel → Meter bei aktuellem Zoom. */
   metersPerPixel: number;
+  /** Abstand der Maßlinie von der Wand-Außenkante in Pixeln (weiter außen, wenn eine Öffnungsmaßkette davor liegt). */
+  offsetPx?: number;
+  /** Lage der Beschriftung entlang der Maßlinie (m ab Anfang, Leserichtung); Standard: Mitte. */
+  labelAlong?: Meters;
 }
 
 /**
  * Architektonische Maßlinie außerhalb der Wand: Hilfslinien an den Innenecken,
  * Maßlinie mit schrägen Begrenzungsstrichen und Beschriftung. Abstände und
  * Linienstärken sind in Pixeln definiert und bleiben beim Zoomen konstant.
+ * Die Beschriftung folgt der Wandrichtung (auch bei schrägen Wänden).
  */
-export function DimensionLine({ dimension, elevation, metersPerPixel }: DimensionLineProps) {
+export function DimensionLine({ dimension, elevation, metersPerPixel, offsetPx = DIMENSION_CONFIG.offsetPx, labelAlong }: DimensionLineProps) {
   const { start, end, outwardNormal: n, wallThickness, length } = dimension;
 
   const { dimensionLine, extensionLines, ticks, labelPosition } = useMemo(() => {
@@ -31,7 +53,7 @@ export function DimensionLine({ dimension, elevation, metersPerPixel }: Dimensio
       p.z + n.z * offset,
     ];
 
-    const lineOffset = wallThickness + px(DIMENSION_CONFIG.offsetPx);
+    const lineOffset = wallThickness + px(offsetPx);
     const extensionFrom = wallThickness + px(DIMENSION_CONFIG.extensionGapPx);
     const extensionTo = lineOffset + px(DIMENSION_CONFIG.extensionOvershootPx);
 
@@ -56,11 +78,10 @@ export function DimensionLine({ dimension, elevation, metersPerPixel }: Dimensio
         [at(end, extensionFrom), at(end, extensionTo)],
       ],
       ticks: [tick(start), tick(end)],
-      labelPosition: at({ x: (start.x + end.x) / 2, z: (start.z + end.z) / 2 }, lineOffset),
+      labelPosition: at({ x: start.x + dirX * (labelAlong ?? length / 2), z: start.z + dirZ * (labelAlong ?? length / 2) }, lineOffset),
     };
-  }, [start, end, n, wallThickness, length, elevation, metersPerPixel]);
+  }, [start, end, n, wallThickness, length, elevation, metersPerPixel, offsetPx, labelAlong]);
 
-  const isVertical = Math.abs(end.z - start.z) > Math.abs(end.x - start.x);
   const lineProps = { color: SCENE_COLORS.dimensionLine, lineWidth: DIMENSION_CONFIG.lineWidthPx };
 
   return (
@@ -72,8 +93,8 @@ export function DimensionLine({ dimension, elevation, metersPerPixel }: Dimensio
       {ticks.map((points, i) => (
         <Line key={`tick-${i}`} points={points} {...lineProps} lineWidth={DIMENSION_CONFIG.lineWidthPx * 1.6} />
       ))}
-      <Html position={labelPosition} center zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>
-        <span className={isVertical ? styles.vertical : undefined}>
+      <Html position={labelPosition} center zIndexRange={[10, 0]} style={HTML_STYLE}>
+        <span style={rotatedStyle(readableAngleDeg(start, end))}>
           <span className={styles.label} data-testid="dimension-label">
             {formatMeters(length)} m
           </span>

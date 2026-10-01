@@ -13,6 +13,12 @@
   gap: 10px;
 }
 
+/* Lagemaße: Beschriftungen dürfen umbrechen („Abstand von rechts“), die Felder bleiben auf einer Linie. */
+.positionRow {
+  composes: row;
+  align-items: end;
+}
+
 .footer {
   padding-top: 4px;
 }

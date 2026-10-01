@@ -3,8 +3,9 @@ import { useThree } from '@react-three/fiber';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { MOUSE, TOUCH, type OrthographicCamera as OrthographicCameraImpl } from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { PLAN_VIEW_CONFIG } from '../../config/scene';
+import { DIMENSION_CONFIG, PLAN_VIEW_CONFIG } from '../../config/scene';
 import { computePlanFitZoom, fitCenter, type FitShape } from '../../utils/camera';
+import type { Opening } from '../../types/opening';
 import type { RoomModel } from '../../utils/room/model';
 import { resetOrbitControls } from '../../utils/orbitControls';
 import { useControlsSettle } from './useControlsSettle';
@@ -19,6 +20,8 @@ const TOUCHES = { ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_PAN };
 interface TopViewProps {
   active: boolean;
   room: RoomModel;
+  /** Öffnungen für die Maßketten an den Wänden. */
+  openings: readonly Opening[];
   /** Einzupassender Umriss; eingepasst wird bei Aktivierung und wenn sich `fitKey` ändert. */
   fitShape: FitShape;
   /** Neu einpassen, wenn sich dieser Schlüssel ändert (Projekt öffnen/neu, neue Raumform, Rechteckmaße). */
@@ -32,7 +35,7 @@ interface TopViewProps {
  * Verzerrung). Zoomen und Verschieben sind möglich, Drehen nicht. Beim Aktivieren
  * und bei Maßänderungen wird der Raum automatisch ins Sichtfeld eingepasst.
  */
-export function TopView({ active, room, fitShape, fitKey, overlay }: TopViewProps) {
+export function TopView({ active, room, openings, fitShape, fitKey, overlay }: TopViewProps) {
   const getState = useThree((state) => state.get);
   const invalidate = useThree((state) => state.invalidate);
   const [camera, setCamera] = useState<OrthographicCameraImpl | null>(null);
@@ -40,11 +43,15 @@ export function TopView({ active, room, fitShape, fitKey, overlay }: TopViewProp
   useControlsSettle(controlsRef, active);
   // Zoom = Pixel pro Meter; steuert die zoomunabhängige Darstellung der Maßlinien.
   const [zoom, setZoom] = useState(1);
+  // Beim Einpassen: Mit Öffnungsmaßketten liegt das Gesamtmaß weiter außen → größerer Mindestrand.
+  // (Wird beim Einpassen gelesen; neue Öffnungen allein passen die Ansicht nicht neu ein.)
+  const hasChains = openings.length > 0;
 
   useLayoutEffect(() => {
     if (!active || !camera) return;
     const { size } = getState();
-    const fitZoom = computePlanFitZoom(fitShape, size.width, size.height);
+    const chainPadding = hasChains ? DIMENSION_CONFIG.chainOverallOffsetPx - DIMENSION_CONFIG.offsetPx : 0;
+    const fitZoom = computePlanFitZoom(fitShape, size.width, size.height, chainPadding);
     const center = fitCenter(fitShape);
     resetOrbitControls(controlsRef.current, () => {
       camera.position.set(center.x, CAMERA_POSITION[1], center.z);
@@ -87,7 +94,7 @@ export function TopView({ active, room, fitShape, fitKey, overlay }: TopViewProp
           onChange={() => setZoom(camera.zoom)}
         />
       )}
-      {active && <RoomDimensionLines room={room} metersPerPixel={1 / zoom} />}
+      {active && <RoomDimensionLines room={room} openings={openings} metersPerPixel={1 / zoom} />}
       {active && overlay?.(1 / zoom)}
     </>
   );

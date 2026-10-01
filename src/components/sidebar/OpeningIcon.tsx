@@ -1,10 +1,16 @@
 import type { OpeningType } from '../../types/opening';
 
-/** Kleine Grundriss-Piktogramme für Tür und Fenster. */
+/** Kleine Grundriss-Piktogramme für Tür, Fenster und Durchgang. */
 export function OpeningIcon({ type }: { type: OpeningType }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-      {type === 'door' ? (
+      {type === 'passage' ? (
+        <>
+          <path d="M1 8h3.5M11.5 8h3.5" strokeWidth="2.4" />
+          <path d="M4.5 5v6M11.5 5v6" />
+          <path d="M4.5 8h7" strokeDasharray="1.6 1.4" />
+        </>
+      ) : type === 'door' ? (
         <>
           <path d="M1.5 14.5h3M11.5 14.5h3" strokeWidth="2" />
           <path d="M4.5 14.5V4.5" strokeWidth="1.8" />

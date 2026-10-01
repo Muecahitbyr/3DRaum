@@ -1,4 +1,4 @@
-import { OPENING_TYPE_LABELS } from '../../config/openings';
+import { OPENING_TYPE_LABELS, OPENING_TYPES } from '../../config/openings';
 import type { Opening, OpeningType } from '../../types/opening';
 import { getOpeningDisplayName } from '../../utils/openingLabels';
 import type { CollisionSeverity } from '../../collision';
@@ -18,21 +18,19 @@ interface OpeningsPanelProps {
   onSelect: (id: string) => void;
 }
 
-const ADDABLE_TYPES: readonly OpeningType[] = ['door', 'window'];
-
 export function OpeningsPanel({ openings, selectedOpeningId, severityById, room, onAdd, onSelect }: OpeningsPanelProps) {
   return (
     <SidebarSection title="Bauelemente" testId="openings-panel">
-      <div className={styles.actions}>
-        {ADDABLE_TYPES.map((type) => (
-          <Button key={type} onClick={() => onAdd(type)} data-testid={`add-${type}`}>
+      <div className={styles.actions3}>
+        {OPENING_TYPES.map((type) => (
+          <Button key={type} onClick={() => onAdd(type)} data-testid={`add-${type}`} title={`${OPENING_TYPE_LABELS[type]} hinzufügen`}>
             <OpeningIcon type={type} />
             {OPENING_TYPE_LABELS[type]}
           </Button>
         ))}
       </div>
       {openings.length === 0 ? (
-        <p className={styles.empty}>Noch keine Türen oder Fenster.</p>
+        <p className={styles.empty}>Noch keine Türen, Fenster oder Durchgänge.</p>
       ) : (
         <ul className={styles.list} aria-label="Platzierte Bauelemente">
           {openings.map((opening) => (

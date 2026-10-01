@@ -261,7 +261,7 @@ await page.getByTestId('save-project-dialog').getByLabel('Projektname').press('E
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
 const sDoor = stored.plan.openings.find((o) => o.type === 'door');
 const sWin = stored.plan.openings.find((o) => o.type === 'window');
-check('Gespeichert: Version 5, Raumobjekte, Anschlag/Richtung, Fensterart', stored.version === 5 && stored.plan.fixtures.length === 3 && sDoor.hinge === 'right' && sDoor.swing === 'outward' && sWin.sashes === 2 && Array.isArray(stored.plan.groups), JSON.stringify({ sDoor, sWin }));
+check('Gespeichert: Version 6, Raumobjekte, Anschlag/Richtung, Fensterart', stored.version === 6 && stored.plan.fixtures.length === 3 && sDoor.hinge === 'right' && sDoor.swing === 'outward' && sWin.sashes === 2 && Array.isArray(stored.plan.groups), JSON.stringify({ sDoor, sWin }));
 check('Gespeicherter Heizkörper vollständig', JSON.stringify(Object.keys(stored.plan.fixtures.find((f) => f.type === 'radiator')).sort()) === JSON.stringify(['depth', 'elevation', 'height', 'id', 'offset', 'type', 'wall', 'width']));
 await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
 check('Nach Neuladen: leerer Plan', (await page.getByTestId('fixture-list-item').count()) === 0);
@@ -326,7 +326,7 @@ check('Migration: unverändert geöffnet gilt als gespeichert', (await page.getB
 await page.getByTestId('add-radiator').click(); await settle();
 await page.keyboard.press('ControlOrMeta+s'); await settle(300);
 const migrated = await page.evaluate(() => JSON.parse(localStorage.getItem('raumplaner:project:alt-v2')));
-check('Nach Speichern: Version 5 mit Anschlag, Flügeln und Raumobjekt', migrated.version === 5 && migrated.plan.openings[0].hinge === 'left' && migrated.plan.openings[1].hinge === 'right' && migrated.plan.openings[2].sashes === 1 && migrated.plan.fixtures.length === 1, JSON.stringify(migrated.plan.openings));
+check('Nach Speichern: Version 6 mit Anschlag, Flügeln und Raumobjekt', migrated.version === 6 && migrated.plan.openings[0].hinge === 'left' && migrated.plan.openings[1].hinge === 'right' && migrated.plan.openings[2].sashes === 1 && migrated.plan.fixtures.length === 1, JSON.stringify(migrated.plan.openings));
 await page.getByTestId('projects-button').click(); await settle();
 await page.getByTestId('project-item').filter({ hasText: 'Altprojekt V1' }).getByTestId('project-open').click(); await settle(600);
 await selectOpening('Tür 1');

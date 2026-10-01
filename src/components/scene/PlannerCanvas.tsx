@@ -16,6 +16,7 @@ import { fitShapeOf } from '../../utils/camera';
 import { furnitureToWorld } from '../../utils/furniture';
 import type { RoomModel } from '../../utils/room/model';
 import { DevSceneBridge } from './DevSceneBridge';
+import { OpeningMeasures } from './annotations/OpeningMeasures';
 import { FurnitureClearances } from './furniture/clearance/FurnitureClearances';
 import { FurnitureLayer } from './furniture/FurnitureLayer';
 import { SelectionBounds } from './furniture/SelectionBounds';
@@ -151,6 +152,8 @@ export function PlannerCanvas({
   );
   // Abstandsmaße nur bei genau einem ausgewählten Möbel – bei Mehrfachauswahl zeigt ein Rahmen die Auswahl.
   const single = selectedFurniture && selectedItems.length === 1;
+  // Lagemaße der ausgewählten Öffnung (nicht im Grundriss-Editor – dort geht es um Ecken und Wände).
+  const selectedOpening = editing ? null : (openings.find((o) => o.id === selectedOpeningId) ?? null);
 
   return (
     <Canvas
@@ -243,6 +246,7 @@ export function PlannerCanvas({
       <TopView
         active={isPlan}
         room={room}
+        openings={openings}
         fitShape={fitShape2d}
         fitKey={fitKey}
         overlay={(metersPerPixel) => (
@@ -259,6 +263,14 @@ export function PlannerCanvas({
             )}
             {selectedItems.length > 1 && (
               <SelectionBounds items={selectedItems} room={room} metersPerPixel={metersPerPixel} />
+            )}
+            {selectedOpening && (
+              <OpeningMeasures
+                opening={selectedOpening}
+                room={room}
+                metersPerPixel={metersPerPixel}
+                onMove={(id, offset) => onUpdateOpening(id, { offset })}
+              />
             )}
           </>
         )}

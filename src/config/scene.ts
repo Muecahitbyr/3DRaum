@@ -58,10 +58,25 @@ export const PLAN_VIEW_CONFIG = {
   maxZoom: 1500,
 } as const;
 
-/** Maßlinien in der 2D-Ansicht; Werte in Bildschirmpixeln, damit sie zoomunabhängig lesbar bleiben. */
+/**
+ * Maßlinien in der 2D-Ansicht; Werte in Bildschirmpixeln, damit sie zoomunabhängig lesbar bleiben.
+ * Hierarchie von der Wand nach außen: Öffnungsmaßkette → zweite Spur für kurze Abschnitte →
+ * Gesamtmaß der Wand. Auswahlmaße (ausgewählte Öffnung, Möbel-Abstände) liegen im Raum.
+ */
 export const DIMENSION_CONFIG = {
-  /** Abstand der Maßlinie von der Außenkante der Wand. */
+  /** Abstand der Maßlinie (Gesamtmaß) von der Außenkante der Wand – Wände ohne Öffnungen. */
   offsetPx: 30,
+  /** Wände mit Öffnungen: Öffnungsmaßkette nah an der Wand … */
+  chainOffsetPx: 22,
+  /** … Beschriftung kurzer Abschnitte auf einer zweiten Spur … */
+  chainLanePx: 40,
+  /** … und das Gesamtmaß der Wand ganz außen. */
+  chainOverallOffsetPx: 62,
+  /** Luft zwischen Kettenbeschriftungen bzw. zu den Begrenzungsstrichen. */
+  chainLabelGapPx: 3,
+  /** Breite der Kettenbeschriftung: je Zeichen (11 px, Ziffern) plus Innenabstand. */
+  chainCharPx: 6.6,
+  chainLabelPaddingPx: 8,
   /** Lücke zwischen Wand und Beginn der Hilfslinie. */
   extensionGapPx: 4,
   /** Überstand der Hilfslinie über die Maßlinie hinaus. */

@@ -1,14 +1,14 @@
 # 3DRaum – 3D-Raumplaner (Übergabedokument)
 
 Browserbasierter Raumplaner: Grundriss (Rechteck, L-Form, freie Polygone) in 2D zeichnen, Türen/Fenster/
-Raumobjekte an Wände setzen, Möbel und Lampen platzieren, Materialien und Licht gestalten, in 3D
+Durchgänge/Raumobjekte an Wände setzen, Möbel und Lampen platzieren, Materialien und Licht gestalten, in 3D
 bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdatei exportieren.
 
-- **Stand:** V1.0.0, produktionsreif. Alle Funktionen fertig und getestet: **1441/1441 Tests in 28 Suiten** grün.
+- **Stand:** V1.0.0 + V1.1 Block A („Maße und Grundriss“). Alle Funktionen fertig und getestet:
+  **1608/1608 Tests in 32 Suiten** grün.
 - **Repository:** https://github.com/Muecahitbyr/3DRaum.git, Branch `main`.
-- **Letzter Code-Commit zum Zeitpunkt dieser Übergabe:** `0e23c90c6d120acc7c4edf7f9fac034a40be83c4`
-  (performance: rendern auf Anforderung). Der Commit dieser CLAUDE.md folgt direkt danach.
-  Den aktuellen Stand liefert `git log`.
+- Den aktuellen Stand liefert `git log` (V1.1 Block A: Raumfläche/Umfang, Öffnungsmaßketten,
+  Lagemaße mit Direkteingabe, Durchgang, L-Form-Hauptmaße, Format 6, Unit-Tests).
 - **Sprache:** Oberfläche, Code-Kommentare, Commits und Berichte an den Nutzer auf **Deutsch**.
   Berichte strukturiert und knapp.
 - **Ziel jetzt:** Stabilität und Qualität. Keine Features auf Verdacht und keine Umbauten ohne Anlass.
@@ -35,6 +35,8 @@ bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdate
   sind selbst geschrieben. **Keine unnötigen Libraries hinzufügen.**
 - Styles: CSS Modules plus `src/styles/global.css` mit Design-Tokens (`--color-*`, `--radius-*`, `--shadow-*`).
 - Tests: eigener Node-Runner mit `playwright-core` und vorhandenem Chromium; kein Jest/Vitest.
+  Unit-Tests laufen als TypeScript direkt in Node (`--experimental-strip-types` + Resolve-Hook
+  `e2e/unit/ts-resolve.mjs` für Importe ohne Dateiendung) – ohne Browser, in Sekunden.
 - Skripte: `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run typecheck`, `npm test`.
 
 ## Verzeichnisstruktur
@@ -54,7 +56,8 @@ src/
   projects/format.ts      Projektformat v5: Parsen, Validieren, Migrationen 1→5
   projects/storage.ts     localStorage (ein Schlüssel je Projekt)
   export/                 planImage (2D-PNG), pdf (Writer), report (Planungsbericht), files (Download/Import)
-  utils/room/             model (RoomModel), plan (Bearbeitung/Validierung), containment, dimensions, remap, snap
+  utils/room/             model (RoomModel), plan (Bearbeitung/Validierung, L-Form), containment, dimensions, remap, snap,
+                          measurements (Fläche/Umfang, Lagemaße, Maßkette), dimensionLayout (Beschriftung aller Wandmaße)
   utils/                  polygon, camera, previewCamera, furniture*, openings, fixtures, wallGeometry, units, webgl …
   components/
     layout/               PlannerLayout (Drawer), Workspace (Toolbars), MenuButton, Fallback, HistoryControls
@@ -64,10 +67,12 @@ src/
     library/              Möbelbibliothek mit Vorschaubildern (eigener Canvas, frameloop 'never')
     ui/                   Button, Dialog (Fokusfalle), SegmentedControl, Text-/Maß-/Auswahlfelder
     scene/                PlannerCanvas, TopView (2D), PerspectiveView (3D), Licht, Lampen, Capture,
-                          room/ (Wände, Boden, Decke, Öffnungen, Raumobjekte, Wand-Fade),
+                          annotations/ (Wandmaß, Öffnungsmaßkette, Lagemaße der Auswahl),
+                          room/ (Wände, Boden, Decke, Öffnungen inkl. Durchgang, Raumobjekte, Wand-Fade),
                           furniture/ (Modelle, Planssymbole, Abstandsmaße, Drehgriff),
                           interaction/ (Drag-Provider, Grundriss-Editor, Auswahlrahmen)
-e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/collision-geometry.test.ts
+e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
+      unit/*.test.ts (reine Logik; harness.ts, ts-resolve*.mjs)
 ```
 
 ## Einheiten und Koordinaten
@@ -94,6 +99,13 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/colli
   - `walls: WallSegment[]` mit Welt-/Plan-Punkten, `axis`, `inward`, Gehrung `outerStart/End`,
     `center`, `rotationY`, `readingReversed`, `horizontal`, `label`
   - `polygon`/`worldPolygon`, `bounds`, `outerPolygon/outerBounds`, `dimensions`, `isRectangle`, `wallById`
+- **Fläche und Umfang** (`roomMeasurements`) kommen immer aus dem Innenumriss (Schnürsenkelformel bzw.
+  Summe der lichten Wandlängen), nie aus der Hülle. Anzeige im Bereich „Raum“, im PNG-Fuß und im PDF.
+- **L-Form:** `LShapeDimensions { width, length, cutWidth, cutLength }` (Ausschnitt rechts unten).
+  Formwechsel übernimmt die aktuellen Maße (`lShapeFromSize`: Ausschnitt ≈ 40 %, auf 0,5 m gerundet; aus 6 × 5
+  wird die alte Vorlage 2,5 × 2). Neue Projekte nutzen die Vorlage 6 × 5. Solange die L-Form unverändert ist
+  (`lShapeDimensionsOf` ≠ null), zeigt der Bereich „Raum“ die vier Hauptmaße (Aktion `setLShapeDimensions`,
+  `resizeLShape` behält Wand-IDs, Stärken und Weltmitte). Nach freier Bearbeitung im Editor entfallen die Felder.
 - `utils/room/plan.ts`: Vorlagen (`createRectangleRoom`, `createLShapeRoom`, `createFreeRoom`) sowie
   `validateRoomPlan`, `moveCorner`, `setWallLength/Thickness`, `splitWall`, `removeCorner/removeWall`,
   `resizeRectangle`, `setRoomHeight`. Alle Bearbeitungen liefern `{ok, plan}` oder `{ok:false, error}`,
@@ -115,6 +127,13 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/colli
     (`computePlanFitZoom`; der Rand passt sich an kleine Bildschirme an).
   - Planssymbole (Möbel, Türbögen, Fenster, Heizkörper), Raummaßlinien und Abstandsmaße
     werden zoomunabhängig in Pixeln skaliert.
+  - **Maßsystem (Hierarchie):** außerhalb der Wand von innen nach außen: Öffnungsmaßkette (22 px, Zahlen in m
+    ohne Einheit, ohne Rahmen) → zweite Spur für kurze Abschnitte (40 px) → Gesamtmaß der Wand (62 px; ohne
+    Öffnungen wie bisher 30 px). Im Raum, blau und anklickbar: Auswahlmaße (Möbel-Abstände, Lagemaße der
+    ausgewählten Öffnung in cm). Wände mit Öffnungen vergrößern beim Einpassen den Rand um 32 px.
+  - **Beschriftung ohne Überdeckung:** `layoutRoomDimensions` platziert alle Wandmaße gemeinsam (Live und PNG):
+    Gesamtmaße zuerst (weichen entlang ihrer Linie aus), Kettenmaße danach (zweite Spur oder entfallen).
+    Etiketten werden als gedrehte Rechtecke geprüft (Trennachsen-Test), Text folgt der Wandrichtung.
 - **3D Bearbeiten** (`PerspectiveView`): FOV 45. Die Kamera wird einmal pro `fitToken` eingepasst
   (Start oder Projekt öffnen) und bleibt sonst stehen.
   - **Wand-Fade** (`useWallFade`): Wände zwischen Kamera und Raum werden pro Frame ohne React-Render
@@ -156,6 +175,12 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/colli
 - **Öffnungen:**
   - Tür: `hinge left|right`, `swing inward|outward`.
   - Fenster: `sillHeight`, `sashes 1|2`.
+  - **Durchgang** (`type: 'passage'`): nur Wand, Position, Breite (0,5–5 m), Höhe; echte Wandöffnung ohne
+    Türblatt, Anschlag und Schwenkbereich. 2D: Laibungen + gestrichelter Sturz; 3D: offen, ausgewählt umrandet.
+    Kollision nur als Wandspanne (`opening-overlap`).
+  - **Lagemaße:** Sidebar „Abstand von links/rechts“ bzw. „oben/unten“ (`readingDistances`,
+    `offsetForReadingDistance`), im Grundriss blaue Maße zu beiden Wandecken mit cm-Eingabe. Intern bleibt
+    es bei `offset` ab Wandanfang; eine Eingabe ist ein Verlaufsschritt („Tür verschieben“).
   - Wandaussparungen: in 3D in echter Größe, im Grundriss über die volle Höhe.
 
 ## Kollisionen und Abstände
@@ -212,9 +237,9 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/colli
   - `LEGACY_LIGHTING` (neutral, 1) entspricht exakt der alten festen Beleuchtung.
   - Kontaktschatten unter Möbeln (`ContactShadow`, eigene Ebene).
 
-## Projektformat (Version 5), Speicherung, Migration
+## Projektformat (Version 6), Speicherung, Migration
 
-- Datei/JSON: `{ format: 'raumplaner-project', version: 5, id, name, createdAt, updatedAt, plan }`.
+- Datei/JSON: `{ format: 'raumplaner-project', version: 6, id, name, createdAt, updatedAt, plan }`.
   `plan` enthält `{ room: {shape, height, walls}, openings, furniture, fixtures, groups, design }`.
   `origin` wird nicht gespeichert; beim Laden wird normalisiert.
 - `parseProject` validiert alles und gibt verständliche deutsche Fehler aus: kein JSON, fremdes Format,
@@ -227,8 +252,10 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/colli
   - 3→4: `dimensions` werden zu vier Wänden `north/east/south/west`; Süd-/West-Offsets auf Wandanfang
     umgerechnet (`Länge − offset − Breite`).
   - 4→5: `wallFinishes {}`, Decke weiß, Licht `LEGACY_LIGHTING`.
+  - 5→6: keine Datenänderung (neue Öffnungsart Durchgang). V1.1-Projekte sind nicht rückwärtskompatibel
+    (V1.0 lehnt Version 6 als „neuere Version“ ab).
   - Alle Versionen ergeben geometrisch identische Szenen; die Suite „migrations“ prüft das.
-    Beim Speichern wird auf Version 5 gehoben.
+    Beim Speichern wird auf Version 6 gehoben.
 - **Neue Formatversion nötig?** Dann `PROJECT_FORMAT_VERSION` erhöhen, Migration ergänzen und
   Tests in `migrations.mjs` erweitern.
 - **localStorage:** Schlüssel `raumplaner:project:<id>`, je Projekt einzeln. Beschädigte Einträge
@@ -243,15 +270,19 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/colli
 - **Grundriss-PNG:** `renderPlanImage` zeichnet direkt aus den Plandaten auf ein 2D-Canvas, ohne Screenshot
   und damit garantiert ohne UI-Hilfselemente.
   - Längste Seite max. 3200 px, weißer Hintergrund.
-  - Inhalt: Wände, Türbögen, Fenster, Raumobjekte, beschriftete Möbel (Lampen über Möbeln werden
-    darunter beschriftet), Wandmaße, Maßstab.
+  - Inhalt: Wände, Türbögen, Fenster, Durchgänge, Raumobjekte, beschriftete Möbel (Lampen über Möbeln werden
+    darunter beschriftet), Wandmaße, Öffnungsmaßketten; Fußzeile unter dem Plan mit Maßstab und
+    Grundfläche/Umfang (schmale Pläne: zweite Zeile).
 - **3D-PNG:** `SceneCapture` rendert einmal mit erhöhter Pixeldichte und kopiert sofort, ohne
   `preserveDrawingBuffer`. Hilfselemente (Umrandungen, Einrastlinien, Auswahlrahmen) werden dabei ausgeblendet.
   - Ist die Vorschau nicht offen, schaltet `capturePreview()` kurz in die Vorschau und stellt Ansicht und
     Kamera danach wieder her.
 - **PDF:** eigener schlanker Writer (`export/pdf.ts`: Helvetica/WinAnsi, JPEG-Bilder, xref).
-  `buildReport` erzeugt Kopf, Datum, Raumdaten und Grundriss, danach 3D-Vorschau, Möbeltabelle
-  (Maße in cm, Position) mit Seitenumbrüchen sowie Türen/Fenster.
+  `buildReport` erzeugt Kopf, Datum, Raumdaten (inkl. Grundfläche, Umfang) und Grundriss, danach
+  3D-Vorschau, Möbeltabelle (Maße in cm, Position) und die Tabelle „Türen, Fenster und Durchgänge“
+  (Wand, Lage „0,80 m von links (rechts 3,30 m)“, B × H, Brüstung, Ausführung), beide mit Seitenumbrüchen.
+- 3D-Bild für den Export: Ausgewählte Türen/Fenster/Raumobjekte (blau eingefärbt) werden für die Aufnahme
+  kurz abgewählt und danach wieder ausgewählt.
 - **Projektdatei `.3draum`** (max. 5 MB):
   - Import über „Projekte“ → „Projektdatei importieren“.
   - Erst validieren, dann als **neues** lokales Projekt speichern und öffnen; bestehende Projekte werden
@@ -340,6 +371,9 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/colli
 - **Bekannte Grenzen:**
   - Projekte liegen nur im Browser (localStorage); Übertragung per `.3draum`.
   - Kein „Alles auswählen“-Kürzel.
+  - Maßketten nur für Türen/Fenster/Durchgänge (nicht für Raumobjekte). Bei sehr kleinem Zoom entfallen
+    einzelne Kettenzahlen statt sich zu überdecken; die Auswahlmaße zeigen sie dann im Raum.
+  - L-Form-Hauptmaße nur für den Ausschnitt rechts unten; frei bearbeitete L-Formen über den Editor.
   - Ohne WebGL keine 3D-Ansicht.
   - Die E2E-Tests laufen mit Software-WebGL (SwiftShader), deshalb sind die Bildraten-Grenzwerte großzügig
     bzw. relativ zu einer Grundlinie im selben Lauf.
@@ -357,6 +391,9 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/colli
     (Playwright-Cache bzw. `E2E_CHROME`).
   - Suiten sind eigenständige Node-Skripte mit `PASS`/`FAIL`-Ausgabe.
   - **Neue Suiten im Array `SUITES` registrieren.** Screenshots landen in `e2e/.output/<suite>/`.
+  - Unit-Suiten (`server: null`) sind `.ts`-Dateien in `e2e/unit/` mit `createSuite()` aus `harness.ts`;
+    sie importieren reine Module aus `src/` direkt (Reducer, Format, Geometrie). `npm test -- unit` < 2 s.
+    Neue reine Logik bevorzugt hier testen, Browser-Suiten für Oberfläche und Szene.
 - Die meisten Suiten laufen gegen den **Dev-Server** (wegen `__PLANNER_R3F__`). Daher **während eines
   laufenden Testlaufs keine Dateien in `src/` ändern**: HMR verfälscht die Ergebnisse.
 - **Hilfen:**
@@ -364,14 +401,15 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images), unit/colli
     `item()`, `openScene()`.
   - `e2e/lib/planner.mjs`: `addFurniture`.
   - `e2e/lib/images.mjs`: `analyzeImage`, `exportFile`.
-- **Suiten (28):**
-  - Grundlagen: Kollisionsgeometrie (Unit), Raumgeometrie, Raum 2D/3D (Preview-Build)
-  - Öffnungen: Türen & Fenster, Drag & Drop Türen/Fenster
+- **Suiten (32):**
+  - Unit: Kollisionsgeometrie, Raummaße & Maßketten, L-Form, Öffnungen/Durchgang/Format 6
+  - Grundlagen: Raumgeometrie, Raum 2D/3D (Preview-Build)
+  - Öffnungen: Türen & Fenster, Drag & Drop Türen/Fenster, **Maße, Durchgang & L-Form**
   - Möbel: Möbel, Drag & Drop Möbel, Möbelbibliothek, Abstandsmaße, Bearbeiten/Mehrfachauswahl/Gruppen
   - Szene: Kollisionen, Kameraabhängige Wände, Raumobjekte, Freie Raumformen & Grundriss-Editor
   - Gestaltung: Gestaltung, Gestaltung/Decke/Licht/Vorschau, Lampen & Möbelfarben, Visuelle Szenen
-  - Verlauf und Projekte: Undo/Redo, Lokale Projekte, Speicherkompatibilität (Format 1–5)
+  - Verlauf und Projekte: Undo/Redo, Lokale Projekte, Speicherkompatibilität (Format 1–6)
   - Performance: Performance, **Rendern auf Anforderung**
   - V1-Abnahme: Export, Mobile/Tablet/Touch, Fehlerbehandlung & Robustheit, Accessibility,
     Visuelle Endabnahme (5 Projekte × 3 Geräte)
-- **Aktueller Stand:** **1441/1441 Tests in 28 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.
+- **Aktueller Stand:** **1608/1608 Tests in 32 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.

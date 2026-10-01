@@ -10,12 +10,14 @@ export interface OpeningDefaults {
 export const OPENING_DEFAULTS: Record<OpeningType, OpeningDefaults> = {
   door: { width: 0.9, height: 2.1, sillHeight: 0 },
   window: { width: 1.2, height: 1.2, sillHeight: 0.9 },
+  passage: { width: 1, height: 2.1, sillHeight: 0 },
 };
 
 /** Absolute Grenzen; zusätzlich begrenzen Wandlänge und Wandhöhe (siehe utils/openings). */
 export const OPENING_LIMITS: Record<OpeningType, { width: [Meters, Meters]; height: [Meters, Meters] }> = {
   door: { width: [0.5, 3], height: [1.5, 3] },
   window: { width: [0.3, 5], height: [0.3, 3] },
+  passage: { width: [0.5, 5], height: [1.5, 3] },
 };
 
 /** Schrittweite der Eingabefelder (↑/↓). */
@@ -25,12 +27,24 @@ export const OPENING_INPUT_STEP: Meters = 0.05;
 export const OPENING_PREFERRED_WALLS: Record<OpeningType, readonly WallSide[]> = {
   door: ['south', 'west', 'east', 'north'],
   window: ['north', 'east', 'west', 'south'],
+  passage: ['east', 'west', 'south', 'north'],
 };
 
 export const OPENING_TYPE_LABELS: Record<OpeningType, string> = {
   door: 'Tür',
   window: 'Fenster',
+  passage: 'Durchgang',
 };
+
+/** Mehrzahl (Listen, Bericht). */
+export const OPENING_TYPE_PLURALS: Record<OpeningType, string> = {
+  door: 'Türen',
+  window: 'Fenster',
+  passage: 'Durchgänge',
+};
+
+/** Reihenfolge der Hinzufügen-Buttons. */
+export const OPENING_TYPES: readonly OpeningType[] = ['door', 'window', 'passage'];
 
 /** 3D-Darstellung der Rahmen und Türblätter. */
 export const OPENING_MODEL_CONFIG = {

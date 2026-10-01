@@ -58,10 +58,11 @@ export function computeFitCameraPosition(shape: FitShape, aspect: number, target
  * Zoom (Pixel pro Meter) für die orthografische Draufsicht, sodass der Raum
  * inkl. Wände und Maßlinien vollständig in die Arbeitsfläche passt.
  */
-export function computePlanFitZoom({ bounds }: FitShape, viewportWidth: number, viewportHeight: number): number {
+export function computePlanFitZoom({ bounds }: FitShape, viewportWidth: number, viewportHeight: number, extraPaddingPx = 0): number {
   // Rand für Maßlinien und Werkzeugleisten; auf kleinen Bildschirmen schmaler (Desktop: 112 px).
-  const padX = Math.min(PLAN_VIEW_CONFIG.fitPaddingPx, Math.max(40, viewportWidth * 0.12));
-  const padY = Math.min(PLAN_VIEW_CONFIG.fitPaddingPx, Math.max(96, viewportHeight * 0.125));
+  // `extraPaddingPx`: zusätzliche Maßebenen (Öffnungsmaßkette schiebt das Gesamtmaß nach außen).
+  const padX = Math.min(PLAN_VIEW_CONFIG.fitPaddingPx, Math.max(40, viewportWidth * 0.12)) + extraPaddingPx;
+  const padY = Math.min(PLAN_VIEW_CONFIG.fitPaddingPx, Math.max(96, viewportHeight * 0.125)) + extraPaddingPx;
   const availableWidth = Math.max(viewportWidth - 2 * padX, 1);
   const availableHeight = Math.max(viewportHeight - 2 * padY, 1);
   const zoom = Math.min(availableWidth / (bounds.maxX - bounds.minX), availableHeight / (bounds.maxZ - bounds.minZ));

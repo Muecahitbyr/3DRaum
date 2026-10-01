@@ -120,6 +120,15 @@ check('Rechteck: Raumform-Auswahl „Rechteck“', (await roomPanel.getByTestId(
 
 // ---------- 2. L-Form ----------
 const cam0 = await camera();
+// Formwechsel übernimmt die aktuellen Maße (5 × 4) – keine feste Vorlage mehr.
+await setShape('L-Form');
+const lFields = async () => Promise.all(['Gesamtbreite', 'Gesamtlänge', 'Ausschnitt Breite', 'Ausschnitt Länge'].map((l) => roomPanel.getByLabel(l, { exact: true }).inputValue()));
+check('L-Form aus Rechteck 5 × 4: Gesamtmaße übernommen, Ausschnitt 2,00 × 1,50', JSON.stringify(await labels()) === '["1,50 m","2,00 m","2,50 m","3,00 m","4,00 m","5,00 m"]' && JSON.stringify(await lFields()) === '["5,00","4,00","2,00","1,50"]', JSON.stringify([await labels(), await lFields()]));
+check('L-Form: Fläche 17,00 m² (5 × 4 − 2 × 1,5), Umfang 18,00 m', (await roomPanel.getByTestId('room-area').textContent()) === '17,00 m²' && (await roomPanel.getByTestId('room-perimeter').textContent()) === '18,00 m');
+await key('ControlOrMeta+z');
+check('Undo: wieder Rechteck 5 × 4', (await room()).shape === 'rectangle' && (await roomPanel.getByTestId('room-area').textContent()) === '20,00 m²');
+await setIn(roomPanel, 'Breite', '6');
+await setIn(roomPanel, 'Länge', '5');
 await setShape('L-Form');
 rm = await room();
 check('L-Form: sechs Wände, Verlauf „Raumform ändern“', rm.walls.length === 6 && rm.shape === 'l-shape' && (await undoTitle()) === 'Raumform ändern rückgängig');
@@ -342,7 +351,9 @@ check('Möbel nach allen Änderungen innerhalb der Kontur', await page.evaluate(
 }));
 // L-Form: Wand mit parallelen Nachbarn kann nicht entfernt werden
 await roomPanel.getByTestId('room-edit-toggle').click(); await settle();
-await setShape('L-Form');
+await setShape('L-Form'); // aus der freien Form 5 × 4 → über die Hauptmaße auf 6 × 5, Ausschnitt 2,5 × 2
+for (const [label, value] of [['Gesamtbreite', '6'], ['Gesamtlänge', '5'], ['Ausschnitt Breite', '2,5'], ['Ausschnitt Länge', '2']]) await setIn(roomPanel, label, value);
+check('L-Form-Hauptmaße eingeben: 6 / 3 / 2,5 / 2 / 3,5 / 5 m', JSON.stringify(await labels()) === '["2,00 m","2,50 m","3,00 m","3,50 m","5,00 m","6,00 m"]', JSON.stringify(await labels()));
 await roomPanel.getByTestId('room-edit-toggle').click(); await settle(400);
 {
   const a = await toScreen(4.75, 3.07);
@@ -373,7 +384,7 @@ await page.getByTestId('project-save').click(); await settle();
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').fill('L-Raum');
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').press('Enter'); await settle(200);
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
-check('Gespeichert (Version 5): Raum mit sechs Wänden (ID, Anfang, Ende, Höhe, Stärke), ohne Ursprung', stored.version === 5 && stored.plan.room.shape === 'l-shape' && stored.plan.room.walls.length === 6 && JSON.stringify(Object.keys(stored.plan.room.walls[0]).sort()) === '["end","height","id","start","thickness"]' && !('origin' in stored.plan.room) && stored.plan.design.wallColors['wall-3'] === '#c98b6b');
+check('Gespeichert (Version 6): Raum mit sechs Wänden (ID, Anfang, Ende, Höhe, Stärke), ohne Ursprung', stored.version === 6 && stored.plan.room.shape === 'l-shape' && stored.plan.room.walls.length === 6 && JSON.stringify(Object.keys(stored.plan.room.walls[0]).sort()) === '["end","height","id","start","thickness"]' && !('origin' in stored.plan.room) && stored.plan.design.wallColors['wall-3'] === '#c98b6b');
 await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
 await page.getByTestId('projects-button').click(); await settle();
 await page.getByTestId('project-item').filter({ hasText: 'L-Raum' }).getByTestId('project-open').click(); await settle(700);
