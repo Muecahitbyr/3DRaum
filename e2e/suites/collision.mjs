@@ -186,7 +186,7 @@ check('3D: nach Auflösen ausgewähltes Sofa blau, Tisch ohne Umrandung', (await
 await selectFurniture('Kleiderschrank 1'); await place('2,5', '0,3');
 await selectFurniture('Esstisch 1');
 check('3D: Fenster-Hinweis als bernsteinfarbene Umrandung am Schrank', (await furnitureLook('Kleiderschrank 1')).outline === 'warning');
-await page.evaluate(() => window.__PLANNER_R3F__().camera.position.set(0.5, 6.5, 3.5)); await settle(900);
+await page.evaluate(() => (() => { const s = window.__PLANNER_R3F__(); s.camera.position.set(0.5, 6.5, 3.5); s.invalidate(); })()); await settle(900);
 await shot('col-3d');
 
 check('Keine Konsolenfehler', errors.length === 0, errors.slice(0, 3).join(' || '));

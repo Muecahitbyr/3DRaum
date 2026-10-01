@@ -157,6 +157,9 @@ export function PlannerCanvas({
       shadows
       flat
       dpr={[1, 2]}
+      // Nur bei Änderungen rendern: Prop-Änderungen, Kamerasteuerung (drei ruft invalidate) und
+      // laufende Übergänge (Wand-Ausblenden) fordern Frames an; im Leerlauf ruht die Szene.
+      frameloop="demand"
       // Klick ins Leere (ohne Ziehen) hebt die Auswahl auf.
       onPointerMissed={() => onSelectOpening(null)}
       // Ein Klick in die Szene beendet eine Feldbearbeitung in der Sidebar (Fokus verlassen),

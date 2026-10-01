@@ -71,10 +71,19 @@
 
 .bottom {
   position: absolute;
+  right: 16px;
   bottom: 16px;
-  left: 50%;
+  left: 16px;
   z-index: 25;
-  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  /* Volle Breite, damit Inhalte nicht schon bei halber Breite gekürzt werden;
+     Klicks neben dem Inhalt gehen weiter an die Szene. */
+  pointer-events: none;
+}
+
+.bottom > * {
+  pointer-events: auto;
 }
 
 @container workspace (max-width: 1060px) {

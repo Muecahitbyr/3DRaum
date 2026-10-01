@@ -186,7 +186,7 @@ await shot('02-l-furniture');
 await toggle('3D');
 floor = await floorInfo();
 check('3D: Boden der L-Form (25 m²)', floor.area === 25);
-await page.evaluate(() => window.__PLANNER_R3F__().camera.position.set(0, 3, 9)); await settle(900);
+await page.evaluate(() => (() => { const s = window.__PLANNER_R3F__(); s.camera.position.set(0, 3, 9); s.invalidate(); })()); await settle(900);
 const l3 = await wallBody('wall-5');
 const lTop = await wallBody('wall-1');
 check('3D: kameranahe Wand (unten) ausgeblendet, gegenüberliegende sichtbar', l3.opacity < 0.2 && lTop.opacity === 1, JSON.stringify([l3.opacity, lTop.opacity]));
@@ -247,7 +247,7 @@ await page.getByTestId('opening-list-item').filter({ hasText: 'Tür 1' }).click(
 check('Tür von der schrägen Wand auf die Ostwand gezogen', (await op.getByLabel('Wand').inputValue()) === 'wall-2', await op.getByLabel('Wand').inputValue());
 await shot('04-free-2d');
 await toggle('3D');
-await page.evaluate(() => window.__PLANNER_R3F__().camera.position.set(6, 3, 6)); await settle(900);
+await page.evaluate(() => (() => { const s = window.__PLANNER_R3F__(); s.camera.position.set(6, 3, 6); s.invalidate(); })()); await settle(900);
 const diag = await wallBody('wall-3');
 const west = await wallBody('wall-5');
 check('3D: schräge Wand zur Kamera wird ausgeblendet, gegenüberliegende bleibt', diag.opacity < 0.2 && west.opacity === 1, JSON.stringify([diag.opacity, west.opacity]));

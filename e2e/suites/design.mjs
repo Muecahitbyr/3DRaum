@@ -74,7 +74,7 @@ let d = await sceneDesign();
 check('Standard: Holz hell ausgewählt und im 3D-Boden aktiv', (await floorPressed()) === 'floor-option-wood-light' && d.floor.id === 'wood-light' && d.floor.type === 'MeshStandardMaterial' && d.floor.bump, JSON.stringify(d.floor));
 check('Boden-Textur im richtigen Maßstab (5 m / 2,4 m, 4 m / 2,4 m) und wiederholend', d.floor.map && d.floor.map.repeat[0] === +(5 / 2.4).toFixed(4) && d.floor.map.repeat[1] === +(4 / 2.4).toFixed(4) && d.floor.map.wrap === 1000);
 check('Standard-Wandfarbe auf allen Wänden', SIDES.every((s) => d.walls[s].color === 'fbfbfa'));
-await page.evaluate(() => window.__PLANNER_R3F__().camera.position.set(0.4, 6.2, 3.4)); await settle(900);
+await page.evaluate(() => (() => { const s = window.__PLANNER_R3F__(); s.camera.position.set(0.4, 6.2, 3.4); s.invalidate(); })()); await settle(900);
 
 // ---------- 2. Alle Bodenarten ----------
 const seen = {};

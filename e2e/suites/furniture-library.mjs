@@ -145,7 +145,7 @@ for (const [index, type] of TYPES.entries()) {
 }
 check('Liste enthält 15 Möbel', (await page.getByTestId('furniture-list-item').count()) === 15);
 check('Rasteraufstellung ohne Kollisionen', (await page.locator('[data-testid="furniture-list-item"] [data-severity]').count()) === 0);
-await page.evaluate(() => window.__PLANNER_R3F__().camera.position.set(1.5, 12, 11)); await settle(900);
+await page.evaluate(() => (() => { const s = window.__PLANNER_R3F__(); s.camera.position.set(1.5, 12, 11); s.invalidate(); })()); await settle(900);
 await shot('all-furniture-3d');
 
 // ---------- 4. Maße: Grenzen und Modelle bei Minimal-/Maximalmaßen ----------

@@ -43,6 +43,7 @@ const orbit = await page.evaluate(async () => {
       const a = (frames / 90) * Math.PI * 2;
       s.camera.position.set(Math.cos(a) * 9, 4, Math.sin(a) * 9);
       s.camera.lookAt(0, 0, 0);
+      s.invalidate();
       if (++frames < 90) requestAnimationFrame(step);
       else resolve();
     };
@@ -91,7 +92,8 @@ async function measureFrames() {
     const times = [];
     let last = performance.now();
     let n = 0;
-    const step = (t) => { times.push(t - last); last = t; if (++n < 60) requestAnimationFrame(step); else { times.sort((a, b) => a - b); resolve(times[30]); } };
+    // Rendern auf Anforderung: jeden Frame anfordern, damit die echte Renderzeit gemessen wird.
+    const step = (t) => { times.push(t - last); last = t; if (++n < 60) { window.__PLANNER_R3F__().invalidate(); requestAnimationFrame(step); } else { times.sort((a, b) => a - b); resolve(times[30]); } };
     requestAnimationFrame(step);
   });
   const medians = [];
@@ -141,6 +143,7 @@ async function measureFrames() {
         const a = (frames / 60) * Math.PI * 2;
         s.camera.position.set(Math.cos(a) * 14, 7, Math.sin(a) * 14);
         s.camera.lookAt(0, 0, 0);
+        s.invalidate();
         times.push(t - last); last = t;
         if (++frames < 60) requestAnimationFrame(step); else resolve();
       };

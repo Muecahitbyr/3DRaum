@@ -135,7 +135,7 @@ check('370° wird begrenzt/normalisiert (0°)', (await val('Rotation')) === '0')
 // ---------- 5. Auswahl in 3D ----------
 await page.mouse.click(1300, 860); await settle(200);
 check('Klick ins Leere: keine Auswahl', (await selectedFurniture()) === null);
-await page.evaluate(() => { window.__PLANNER_R3F__().camera.position.set(0.3, 7.5, 3.2); });
+await page.evaluate(() => { (() => { const s = window.__PLANNER_R3F__(); s.camera.position.set(0.3, 7.5, 3.2); s.invalidate(); })(); });
 await settle(900);
 await shot('furniture-3d-top');
 for (const type of ['bed', 'wardrobe', 'sofa', 'table']) {

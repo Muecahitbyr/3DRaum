@@ -126,7 +126,7 @@ const setRoom = async (page, label, value) => { const i = roomInput(page, label)
   check('150 Möbel: Projekt öffnet', (await page.getByTestId('furniture-list-item').count()) === 150, `${Date.now() - t0} ms`);
   await page.getByRole('button', { name: '2D', exact: true }).click(); await settle(900);
   await page.getByRole('button', { name: '3D', exact: true }).click(); await settle(900);
-  const frame = await page.evaluate(() => new Promise((resolve) => { const t = []; const step = (now) => { t.push(now); if (t.length < 31) requestAnimationFrame(step); else resolve((t[30] - t[0]) / 30); }; requestAnimationFrame(step); }));
+  const frame = await page.evaluate(() => new Promise((resolve) => { const t = []; const step = (now) => { t.push(now); if (t.length < 31) { window.__PLANNER_R3F__().invalidate(); requestAnimationFrame(step); } else resolve((t[30] - t[0]) / 30); }; requestAnimationFrame(step); }));
   check('150 Möbel: 3D rendert flüssig genug (Software-Rendering)', frame < 250, `${frame.toFixed(1)} ms/Frame`);
   await page.getByTestId('furniture-list-item').filter({ hasText: 'Stuhl 150' }).click(); await settle(400);
   check('150 Möbel: Auswahl über die Liste', (await page.getByTestId('furniture-properties').getByLabel('Name', { exact: true }).inputValue()) === 'Stuhl 150');

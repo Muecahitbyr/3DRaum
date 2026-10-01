@@ -48,7 +48,7 @@ async function settleWalls(timeout = 4000) {
   }
   return walls();
 }
-const setCamera = async (x, y, z) => { await page.evaluate(([x, y, z]) => window.__PLANNER_R3F__().camera.position.set(x, y, z), [x, y, z]); return settleWalls(); };
+const setCamera = async (x, y, z) => { await page.evaluate(([x, y, z]) => (() => { const s = window.__PLANNER_R3F__(); s.camera.position.set(x, y, z); s.invalidate(); })(), [x, y, z]); return settleWalls(); };
 /** Erwartung aus der Kameraposition: Wand ausgeblendet, wenn die Kamera deutlich außerhalb ihrer Ebene steht. */
 // Mitte des Übergangsbands (−0,2 … 0,8 m) = Sichtbarkeit 0,5
 const expected = ([x, , z]) => SIDES.filter((s) => ({ north: -z - L / 2, south: z - L / 2, east: x - W / 2, west: -x - W / 2 })[s] > 0.3).sort().join('+') || '–';
@@ -119,7 +119,7 @@ check('Flach von Osten: nur Ostwand (nicht pauschal zwei Wände)', fadedSet(w) =
 
 // ---------- 4. Weicher Übergang ----------
 await setCamera(0, 3, 9);
-await page.evaluate(() => window.__PLANNER_R3F__().camera.position.set(0, 3, -9));
+await page.evaluate(() => (() => { const s = window.__PLANNER_R3F__(); s.camera.position.set(0, 3, -9); s.invalidate(); })());
 const samples = [];
 for (let i = 0; i < 12; i++) { const x = await walls(); samples.push([x.south.vis, x.north.vis]); await settle(40); }
 const southSeq = samples.map((s) => s[0]); const northSeq = samples.map((s) => s[1]);

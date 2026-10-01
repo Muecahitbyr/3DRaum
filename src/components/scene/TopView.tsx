@@ -7,6 +7,7 @@ import { PLAN_VIEW_CONFIG } from '../../config/scene';
 import { computePlanFitZoom, fitCenter, type FitShape } from '../../utils/camera';
 import type { RoomModel } from '../../utils/room/model';
 import { resetOrbitControls } from '../../utils/orbitControls';
+import { useControlsSettle } from './useControlsSettle';
 import { RoomDimensionLines } from './annotations/RoomDimensionLines';
 
 /** Norden (-z) zeigt im Grundriss nach oben. */
@@ -33,8 +34,10 @@ interface TopViewProps {
  */
 export function TopView({ active, room, fitShape, fitKey, overlay }: TopViewProps) {
   const getState = useThree((state) => state.get);
+  const invalidate = useThree((state) => state.invalidate);
   const [camera, setCamera] = useState<OrthographicCameraImpl | null>(null);
   const controlsRef = useRef<OrbitControlsImpl>(null);
+  useControlsSettle(controlsRef, active);
   // Zoom = Pixel pro Meter; steuert die zoomunabhängige Darstellung der Maßlinien.
   const [zoom, setZoom] = useState(1);
 
@@ -50,6 +53,7 @@ export function TopView({ active, room, fitShape, fitKey, overlay }: TopViewProp
       controlsRef.current?.target.set(center.x, 0, center.z);
     });
     setZoom(fitZoom);
+    invalidate();
     // Nur bei Aktivierung und neuem Schlüssel – Bearbeitungen am Grundriss lassen die Ansicht stehen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, camera, getState, fitKey]);

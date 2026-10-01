@@ -63,9 +63,10 @@ function applyWallVisibility(group: Object3D, bodyName: string, visibility: numb
 }
 
 /**
- * Kameraabhängiges Ausblenden einer Wand in der 3D-Ansicht. Läuft pro Frame
+ * Kameraabhängiges Ausblenden einer Wand in der 3D-Ansicht. Läuft pro gerendertem Frame
  * ohne React-Re-Render (Materialwerte werden direkt gesetzt); nur wenn sich die
- * Klickbarkeit ändert, wird einmal neu gerendert.
+ * Klickbarkeit ändert, wird einmal neu gerendert. Während der Überblendung werden
+ * weitere Frames angefordert (Canvas rendert nur auf Anforderung).
  *
  * @returns `true`, solange die Wand sichtbar genug ist, um Klicks anzunehmen.
  */
@@ -79,7 +80,7 @@ export function useWallFade(groupRef: RefObject<Object3D | null>, wall: WallSegm
   const interactiveRef = useRef(true);
   const bodyName = `wall-${wall.id}-body`;
 
-  useFrame(({ camera }, delta) => {
+  useFrame(({ camera, invalidate }, delta) => {
     const group = groupRef.current;
     if (!group) return;
 
@@ -93,6 +94,8 @@ export function useWallFade(groupRef: RefObject<Object3D | null>, wall: WallSegm
     wasEnabled.current = enabled;
     let next = !enabled ? 1 : entering ? target : MathUtils.damp(visibility.current, target, CFG.smoothing, Math.min(delta, 0.1));
     if (Math.abs(next - target) < 0.002) next = target;
+    // Rendern auf Anforderung: Solange die Überblendung läuft, den nächsten Frame anfordern.
+    if (next !== target) invalidate();
     visibility.current = next;
     group.userData.visibility = next;
 

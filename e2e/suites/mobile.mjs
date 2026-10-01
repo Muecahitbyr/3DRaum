@@ -250,6 +250,8 @@ for (const vp of VIEWPORTS) {
   check('Zurück in „Bearbeiten“: Standard-Sichtfeld', (await page.evaluate(() => window.__PLANNER_R3F__().camera.fov)) === 45);
   const couch = await screenOf('Couchtisch');
   await tap(couch.x, couch.y);
+  const chipFits = await page.getByTestId('selection-chip').evaluate((el) => { const n = el.querySelector('.selection-chip-name'); return n.scrollWidth <= n.clientWidth; }).catch(() => false);
+  check('Auswahl-Chip: Name vollständig lesbar (nicht vorzeitig gekürzt)', chipFits);
   check('Touch 3D: Antippen wählt Möbel aus', (await page.getByTestId('selection-chip').textContent().catch(() => '')).includes('Couchtisch'));
   await page.screenshot({ path: `${OUT}/touch-3d.png` });
   await context.close();

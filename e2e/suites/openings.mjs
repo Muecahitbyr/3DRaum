@@ -260,7 +260,7 @@ await toggle('3D'); await shot('overview-3d');
   const target = items.find((o) => o.type === 'window' && o.wall === 'wall-north') ?? items.find((o) => o.wall === 'wall-north');
   // Kamera genau vor dem Ziel: der Strahl trifft die Südwand bei x = Ziel-x (dort keine Öffnung).
   const tx = (target.min.x + target.max.x) / 2;
-  await page.evaluate(({ x, y }) => { const s = window.__PLANNER_R3F__(); s.camera.position.set(x, y, 9); }, { x: tx, y: target.centerY });
+  await page.evaluate(({ x, y }) => { const s = window.__PLANNER_R3F__(); s.camera.position.set(x, y, 9); s.invalidate(); }, { x: tx, y: target.centerY });
   await settle(900);
   // Ziel liegt auf der Nordwand; der Sichtstrahl trifft zuerst die massive Südwand.
   const q = await screenPos(target.id);

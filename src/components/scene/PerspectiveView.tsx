@@ -9,6 +9,7 @@ import { keepInside, PREVIEW_CAMERA, previewPose } from '../../utils/previewCame
 import type { FloorPoint } from '../../types/room';
 import type { RoomModel } from '../../utils/room/model';
 import { resetOrbitControls } from '../../utils/orbitControls';
+import { useControlsSettle } from './useControlsSettle';
 
 const PREVIEW_FOV = 60;
 /** Hochformat (Smartphone/Tablet): mindestens so viel horizontaler Blickwinkel … */
@@ -47,8 +48,11 @@ export function PerspectiveView({ active, fitShape, fitToken, preview = false, r
   const obstaclesRef = useRef(obstacles);
   obstaclesRef.current = obstacles;
   const size = useThree((state) => state.size);
+  // Kamerasprünge (Einpassen, Vorschau) ändern keine React-Props → Frame explizit anfordern.
+  const invalidate = useThree((state) => state.invalidate);
   const [camera, setCamera] = useState<PerspectiveCameraImpl | null>(null);
   const controlsRef = useRef<OrbitControlsImpl>(null);
+  useControlsSettle(controlsRef, active);
   const fittedToken = useRef<number | null>(null);
 
   useLayoutEffect(() => {
@@ -63,7 +67,8 @@ export function PerspectiveView({ active, fitShape, fitToken, preview = false, r
       controlsRef.current?.target.copy(target);
     });
     fittedToken.current = fitToken;
-  }, [camera, size, fitShape, fitToken]);
+    invalidate();
+  }, [camera, size, fitShape, fitToken, invalidate]);
 
   // Vorschau betreten: Bearbeitungskamera merken, auf Augenhöhe in den Raum wechseln.
   // Verlassen: gemerkte Bearbeitungskamera wiederherstellen.
@@ -98,14 +103,16 @@ export function PerspectiveView({ active, fitShape, fitToken, preview = false, r
         camera.lookAt(target);
       });
     }
-  }, [preview, camera]);
+    invalidate();
+  }, [preview, camera, invalidate]);
 
   // Vorschau: Sichtfeld folgt dem Seitenverhältnis (z. B. Drehen des Geräts).
   useLayoutEffect(() => {
     if (!preview || !camera) return;
     camera.fov = previewFov(aspect);
     camera.updateProjectionMatrix();
-  }, [preview, camera, aspect]);
+    invalidate();
+  }, [preview, camera, aspect, invalidate]);
 
   // Vorschau: Kamera und Drehzentrum bleiben im Raum (keine React-Updates – direkt im Frame).
   useFrame(() => {
