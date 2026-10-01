@@ -141,8 +141,9 @@ export function renderPlanImage(input: PlanImageInput, options: PlanImageOptions
       input.furniture.some(
         (other) => other !== item && !isLamp(other.type) && pointInPolygon(item.position, rectanglePolygon(other.position, other.width / 2, other.depth / 2, other.rotationDeg)),
       );
+    const stacked = stackedLabelShifts(ordered);
     // Teppiche ohne Beschriftung (liegen unter Möbeln; im PDF-Bericht aufgeführt).
-    for (const item of ordered) drawLabel(ctx, item, P, px, below(item));
+    for (const item of ordered) drawLabel(ctx, item, P, px, below(item), stacked.get(item.id) ?? 0);
   }
 
   // Maße je Wand: Öffnungsmaßkette (falls Öffnungen) und Gesamtmaß – wie im Grundriss,
@@ -347,7 +348,31 @@ function drawFurniture(ctx: Ctx, item: FurnitureItem, P: (p: FloorPoint) => [num
   ctx.restore();
 }
 
-function drawLabel(ctx: Ctx, item: FurnitureItem, P: (p: FloorPoint) => [number, number], px: (m: number) => number, below = false) {
+/**
+ * Oberschrank über einem stehenden Möbel (Unterschrank, Spüle …): Mittelpunkte liegen fast
+ * aufeinander, die Beschriftungen würden sich decken. Dann steht die des Oberschranks eine halbe
+ * Zeile höher (−1), die des Möbels darunter eine halbe Zeile tiefer (+1). ID → Verschiebung.
+ */
+export function stackedLabelShifts(furniture: readonly FurnitureItem[]): Map<string, -1 | 1> {
+  const shifts = new Map<string, -1 | 1>();
+  for (const top of furniture) {
+    if (!FURNITURE_CATALOG[top.type].wallMounted) continue;
+    const base = furniture.find(
+      (other) =>
+        other !== top &&
+        other.type !== 'rug' &&
+        !isLamp(other.type) &&
+        !FURNITURE_CATALOG[other.type].wallMounted &&
+        pointInPolygon(top.position, rectanglePolygon(other.position, other.width / 2, other.depth / 2, other.rotationDeg)),
+    );
+    if (!base) continue;
+    shifts.set(top.id, -1);
+    shifts.set(base.id, 1);
+  }
+  return shifts;
+}
+
+function drawLabel(ctx: Ctx, item: FurnitureItem, P: (p: FloorPoint) => [number, number], px: (m: number) => number, below = false, shift = 0) {
   const [x, center] = P(item.position);
   const maxWidth = px(Math.max(item.width, item.depth) * 1.1);
   let size = Math.min(px(0.13), 30);
@@ -358,7 +383,7 @@ function drawLabel(ctx: Ctx, item: FurnitureItem, P: (p: FloorPoint) => [number,
   }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const y = below ? center + px(Math.max(item.width, item.depth) / 2) + size * 0.8 : center;
+  const y = (below ? center + px(Math.max(item.width, item.depth) / 2) + size * 0.8 : center) + shift * size * 0.65;
   ctx.lineWidth = Math.max(3, size * 0.28);
   ctx.strokeStyle = 'rgba(255,255,255,0.92)';
   ctx.strokeText(item.name, x, y);

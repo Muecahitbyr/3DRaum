@@ -5,7 +5,7 @@ Durchgänge/Raumobjekte an Wände setzen, Möbel und Lampen platzieren, Material
 bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdatei exportieren.
 
 - **Stand:** **V1.1.0, feature-complete** (App-Version in `package.json`; unabhängig davon Projektformat 7).
-  Alle Funktionen fertig und getestet: **2059/2059 Tests in 39 Suiten** grün.
+  Alle Funktionen fertig und getestet: **2065/2065 Tests in 39 Suiten** grün.
 - **Repository:** https://github.com/Muecahitbyr/3DRaum.git, Branch `main`.
 - V1.1 besteht aus drei Blöcken (Details: `git log`):
   - **Block A – Maße und Grundriss:** Raumfläche/Umfang, Öffnungsmaßketten, Lagemaße mit Direkteingabe,
@@ -224,7 +224,8 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - Drehgriff im Grundriss, Einrasten an Wänden und Möbeln (`computeFurnitureMove`).
   - Tastenkürzel greifen nicht in Eingabefeldern und pausieren, solange ein Dialog offen ist.
 - **Raumobjekte** (`RoomFixture`: radiator, socket, switch): wandgebunden wie Öffnungen, mit `depth`
-  und `elevation`.
+  und `elevation`. Neue Raumobjekte (`createFixture`) meiden Objekte gleicher Art und Öffnungen in ihrer
+  Höhe (dort fehlt die Wand); ein Heizkörper unter der Fensterbrüstung bleibt erlaubt.
 - **Öffnungen:**
   - Tür: `hinge left|right`, `swing inward|outward`.
   - Fenster: `sillHeight`, `sashes 1|2`.
@@ -363,7 +364,8 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
     darunter beschriftet), Wandmaße, Öffnungsmaßketten; Fußzeile unter dem Plan mit Maßstab und
     Grundfläche/Umfang (schmale Pläne: zweite Zeile).
   - Reihenfolge: Boden → Teppiche (unbeschriftet, unter Türbögen) → Wände/Öffnungen → Möbel → Oberschränke
-    (gestrichelt, ohne Füllung) → Lampen.
+    (gestrichelt, ohne Füllung) → Lampen. Hängt ein Oberschrank über einem Möbel, stehen beide Beschriftungen
+    eine halbe Zeile versetzt übereinander (`stackedLabelShifts`), sonst wären sie deckungsgleich.
 - **3D-PNG:** `SceneCapture` rendert einmal mit erhöhter Pixeldichte und kopiert sofort, ohne
   `preserveDrawingBuffer`. Hilfselemente (Umrandungen, Einrastlinien, Auswahlrahmen) werden dabei ausgeblendet.
   - Ist die Vorschau nicht offen, schaltet `capturePreview()` kurz in die Vorschau und stellt Ansicht und
@@ -471,7 +473,9 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - Projekte liegen nur im Browser (localStorage); Übertragung per `.3draum`.
   - Kein „Alles auswählen“-Kürzel.
   - Maßketten nur für Türen/Fenster/Durchgänge (nicht für Raumobjekte). Bei sehr kleinem Zoom entfallen
-    einzelne Kettenzahlen statt sich zu überdecken; die Auswahlmaße zeigen sie dann im Raum.
+    einzelne Kettenzahlen statt sich zu überdecken; die Auswahlmaße zeigen sie dann im Raum. Gesamtmaße
+    entfallen nie: Findet sich an einer engen Innenecke keine freie Lage, bleiben sie mittig und können sich
+    dort bei kleinem Maßstab berühren (lesbar; beim Hineinzoomen getrennt).
   - L-Form-Hauptmaße nur für den Ausschnitt rechts unten; frei bearbeitete L-Formen über den Editor.
   - Kollisionszonen nur für Esstisch, Schreibtisch, Stuhl, Bürostuhl; alle anderen sind Quader.
     Abstandsmaße übergehen ein erlaubt überdeckendes Möbel (z. B. den Tisch über dem Stuhl).
@@ -527,4 +531,4 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - Performance: Performance (inkl. 150 gemischte Küchen-/Bad-Objekte + 10 Lampen), **Rendern auf Anforderung**
   - V1-Abnahme: Export, Mobile/Tablet/Touch, Fehlerbehandlung & Robustheit, Accessibility,
     Visuelle Endabnahme (5 Projekte × 3 Geräte)
-- **Aktueller Stand:** **2059/2059 Tests in 39 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.
+- **Aktueller Stand:** **2065/2065 Tests in 39 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.

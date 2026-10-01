@@ -1,6 +1,7 @@
 import { computeCollisionReport } from '../../src/collision/index.ts';
 import { furnitureZones } from '../../src/collision/furnitureZones.ts';
 import { FURNITURE_CATALOG, FURNITURE_CATEGORIES, FURNITURE_TYPES } from '../../src/config/furniture.ts';
+import { stackedLabelShifts } from '../../src/export/planImage.ts';
 import { WALL_FINISHES } from '../../src/config/design.ts';
 import { filterLibrary } from '../../src/components/library/libraryFilter.ts';
 import { parseProject, PROJECT_FORMAT_VERSION, serializeProject } from '../../src/projects/format.ts';
@@ -13,6 +14,8 @@ import { furniturePlanDetails } from '../../src/utils/furniturePlan.ts';
 import { supportElevations } from '../../src/utils/furnitureSupport.ts';
 import { roomModelOf } from '../../src/utils/room/model.ts';
 import { createRectangleRoom } from '../../src/utils/room/plan.ts';
+import type { Opening } from '../../src/types/opening.ts';
+import { createFixture } from '../../src/utils/fixtures.ts';
 import { createSuite } from './harness.ts';
 
 /** Küche, Bad, Teppich, Pflanze: Katalog, Suche, Kollisionen (Teppich, Oberschrank), Platzsuche, Format 7. */
@@ -104,5 +107,30 @@ const v6 = parseProject(JSON.stringify({ ...file, version: 6, plan: { ...file.pl
 check('Version 6 → 7: unverändert lesbar, auf 7 gehoben', v6.ok && v6.project.version === 7 && v6.warnings.length === 0);
 const withRug = parseProject(JSON.stringify({ ...file, plan: { ...file.plan, furniture: [{ ...item('rug', 2, 2), height: 0.5 }] } }));
 check('Teppich: Höhe auf 0,5–3 cm begrenzt', withRug.ok && withRug.project.plan.furniture[0].height === 0.03);
+
+// ---------- Endabnahme: Beschriftung Ober-/Unterschrank im Grundriss-PNG
+// Küchenzeile an der linken Wand (270°): Mittelpunkte nur 12,5 cm quer versetzt – waagerechte
+// Texte lagen deckungsgleich. Jetzt: Oberschrank eine halbe Zeile höher, Schrank darunter tiefer.
+const sink = { ...item('kitchen-sink', 0.3, 5.22), width: 0.8, depth: 0.6, height: 0.9, rotationDeg: 270 };
+const hanging = { ...item('kitchen-wall', 0.175, 5.22), id: 'oben', width: 0.6, depth: 0.35, height: 0.7, rotationDeg: 270, elevation: 1.45 };
+const lone = { ...item('kitchen-wall', 0.175, 2), id: 'allein', width: 0.6, depth: 0.35, height: 0.7, rotationDeg: 270, elevation: 1.45 };
+const shifts = stackedLabelShifts([sink, hanging, lone] as FurnitureItem[]);
+check('PNG-Beschriftung: Oberschrank über Spüle → oben/unten getrennt', shifts.get('oben') === -1 && shifts.get(sink.id) === 1, [...shifts]);
+check('PNG-Beschriftung: frei hängender Oberschrank bleibt mittig', !shifts.has('allein'));
+
+// ---------- Endabnahme: neue Raumobjekte nicht in Öffnungen (dort fehlt die Wand)
+const fixtureRoom = roomModelOf(createRectangleRoom({ width: 5, length: 4, height: 2.5 }));
+const doorSouth = { id: 'o1', type: 'door', wall: 'south', offset: 2.05, width: 0.9, height: 2.1, hinge: 'right', swing: 'inward' } as Opening;
+const passageEast = { id: 'o2', type: 'passage', wall: 'east', offset: 1, width: 2, height: 2.1 } as Opening;
+const windowNorth = { id: 'o3', type: 'window', wall: 'north', offset: 1.5, width: 2, height: 1.2, sillHeight: 0.9, sashes: 2 } as Opening;
+const inside = (f: { offset: number; width: number }, o: Opening) => f.offset < o.offset + o.width && f.offset + f.width > o.offset;
+const sw = createFixture('switch', 'f1', [], fixtureRoom, [doorSouth]);
+check('Lichtschalter: Südwand, aber neben der Tür (nicht in der Öffnung)', sw.wall === 'south' && !inside(sw, doorSouth), sw);
+const so = createFixture('socket', 'f2', [], fixtureRoom, [passageEast]);
+check('Steckdose: Ostwand, aber neben dem Durchgang', so.wall === 'east' && !inside(so, passageEast), so);
+const ra = createFixture('radiator', 'f3', [], fixtureRoom, [windowNorth]);
+check('Heizkörper unter der Fensterbrüstung bleibt erlaubt (Nordwand mittig)', ra.wall === 'north' && ra.offset === 2, ra);
+const full = { id: 'o4', type: 'passage', wall: 'east', offset: 0, width: 4, height: 2.1 } as Opening;
+check('Wand ganz offen → nächste bevorzugte Wand', createFixture('socket', 'f4', [], fixtureRoom, [full]).wall === 'south');
 
 done();

@@ -491,7 +491,7 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
 
     case 'addFixture': {
       const id = `fixture-${state.nextFixtureNumber}`;
-      const fixture = createFixture(action.fixtureType, id, state.fixtures, model(state));
+      const fixture = createFixture(action.fixtureType, id, state.fixtures, model(state), state.openings);
       return {
         ...state,
         fixtures: [...state.fixtures, fixture],

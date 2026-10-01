@@ -1,5 +1,6 @@
 import { FIXTURE_CATALOG } from '../config/fixtures';
 import type { FixtureType, RoomFixture } from '../types/fixture';
+import type { Opening } from '../types/opening';
 import type { FloorPoint, WallSegment } from '../types/room';
 import { findFreeOffset, getWallLength, wallsByPreference, type FieldLimits } from './openings';
 import type { RoomModel } from './room/model';
@@ -45,15 +46,27 @@ export function normalizeFixture(fixture: RoomFixture, room: RoomModel): RoomFix
   return { ...sized, offset: fit(fixture.offset, limits.offset), elevation: fit(fixture.elevation, limits.elevation) };
 }
 
-/** Neues Raumobjekt mit Standardmaßen an der ersten Wand mit freiem Platz. */
-export function createFixture(type: FixtureType, id: string, existing: readonly RoomFixture[], room: RoomModel): RoomFixture {
+/** Höhenbereich einer Öffnung über dem Boden (Fenster ab Brüstung, Tür/Durchgang ab Boden). */
+const openingHeightRange = (o: Opening): [number, number] => (o.type === 'window' ? [o.sillHeight, o.sillHeight + o.height] : [0, o.height]);
+
+/**
+ * Neues Raumobjekt mit Standardmaßen an der ersten Wand mit freiem Platz. Gemieden werden
+ * Objekte gleicher Art und Öffnungen in seiner Höhe (dort fehlt die Wand) – ein Heizkörper
+ * unter der Fensterbrüstung bleibt möglich, eine Steckdose im Durchgang nicht.
+ */
+export function createFixture(type: FixtureType, id: string, existing: readonly RoomFixture[], room: RoomModel, openings: readonly Opening[] = []): RoomFixture {
   const { defaults, preferredWalls } = FIXTURE_CATALOG[type];
-  const sameType = existing.filter((f) => f.type === type);
+  const top = defaults.elevation + defaults.height;
+  const blocking = openings.filter((o) => {
+    const [y0, y1] = openingHeightRange(o);
+    return y0 < top && y1 > defaults.elevation;
+  });
+  const occupied = [...existing.filter((f) => f.type === type), ...blocking];
   const walls = wallsByPreference(room, preferredWalls);
   let wall = walls[0];
   let offset = (wall.length - defaults.width) / 2;
   for (const candidate of walls) {
-    const free = findFreeOffset(candidate.id, defaults.width, candidate.length, sameType);
+    const free = findFreeOffset(candidate.id, defaults.width, candidate.length, occupied);
     if (free !== null) {
       wall = candidate;
       offset = free;
