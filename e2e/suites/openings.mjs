@@ -123,6 +123,7 @@ for (const side of ['north', 'east', 'south', 'west']) {
   if (side === 'east') { await toggle('2D'); await shot(`door-east-2d`); await toggle('3D'); }
 }
 await page.getByTestId('delete-opening').click(); await settle(300);
+await page.getByTestId('confirm-accept').click(); await settle();
 
 // ---------- 2. Fenster an jeder Wand ----------
 await add('window');
@@ -136,6 +137,7 @@ for (const side of ['north', 'east', 'south', 'west']) {
   check(`Fenster an Wand ${side}: Lage korrekt (Mitte 1,50 m hoch)`, withinWall(o) && near(o.centerY, 0.9 + 0.6));
 }
 await page.getByTestId('delete-opening').click(); await settle(300);
+await page.getByTestId('confirm-accept').click(); await settle();
 check('Nach Löschen: keine Elemente mehr in Szene', (await inspect()).length === 0);
 
 // ---------- 3. Mehrere Elemente an einer Wand ----------
@@ -226,6 +228,7 @@ const before = (await inspect()).length;
 await page.getByTestId('opening-list-item').nth(1).click(); await settle(200);
 const deletedId = (await inspect()).find((o) => o.id === winIds[1]);
 await page.getByTestId('delete-opening').click(); await settle(300);
+await page.getByTestId('confirm-accept').click(); await settle();
 items = await inspect();
 check('Löschen entfernt Element aus Liste und Szene', items.length === before - 1 && (await page.getByTestId('opening-list-item').count()) === before - 1 && !items.some((o) => o.id === winIds[1]));
 check('Nach Löschen keine Auswahl', (await selectedName()) === null);

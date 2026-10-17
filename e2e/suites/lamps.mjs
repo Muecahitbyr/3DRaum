@@ -168,6 +168,7 @@ await key('ControlOrMeta+c'); await key('ControlOrMeta+v');
 copyId = await lastId();
 check('Copy/Paste: dritte Deckenleuchte leuchtet', (await scene()).lights.some((l) => l.id === copyId && l.intensity > 0));
 await key('Delete');
+await page.getByTestId('confirm-accept').click(); await settle();
 check('Löschen: Verlauf „Lampe löschen“', (await undoTitle()) === 'Lampe löschen rückgängig');
 await key('ControlOrMeta+z');
 

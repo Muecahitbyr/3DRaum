@@ -6,7 +6,7 @@ bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdate
 mehrere Zimmer (Wohnungsgrundriss mit gemeinsamen Wänden) und mehrere Etagen.
 
 - **Stand:** **V1.2.0** (App-Version in `package.json`; unabhängig davon Projektformat 8).
-  Alle Funktionen fertig und getestet: **2158/2158 Tests in 41 Suiten** grün.
+  Alle Funktionen fertig und getestet: **2188/2188 Tests in 42 Suiten** grün.
 - **Repository:** https://github.com/Muecahitbyr/3DRaum.git, Branch `main`.
 - V1.1 besteht aus drei Blöcken (Details: `git log`):
   - **Block A – Maße und Grundriss:** Raumfläche/Umfang, Öffnungsmaßketten, Lagemaße mit Direkteingabe,
@@ -281,7 +281,7 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - **Neue Möbel** (`findFreePlacement` → Wandplatzierung bzw. `findFreePosition`): deterministische
     Platzsuche auf 25-cm-Raster um die Raummitte (max. 600 Plätze), erster Platz ohne Kollision (Möbel, Wände,
     Türschwenk, Fenster, Heizkörper); sonst Raummitte mit Warnung.
-  - Duplizieren Strg/⌘+D, Kopieren/Einfügen (Versatz 0,2 m), Entf/Backspace löscht.
+  - Duplizieren Strg/⌘+D, Kopieren/Einfügen (Versatz 0,2 m), Entf/Backspace löscht (nach Abfrage, siehe unten).
   - Pfeiltasten verschieben, Ausrichten an Wänden bzw. Raummitte (`AlignmentTools`).
   - Drehgriff im Grundriss, Einrasten an Wänden und Möbeln (`computeFurnitureMove`).
   - Tastenkürzel greifen nicht in Eingabefeldern und pausieren, solange ein Dialog offen ist.
@@ -340,6 +340,19 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - Das Etikett ist klickbar und nimmt einen exakten Abstand in cm entgegen.
   - Bei kurzen Abständen sitzt das Etikett **neben dem Möbel**, nie darüber, sonst würde es
     Finger/Maus beim Greifen abfangen.
+
+## Löschen: Sicherheitsabfrage und Kontextmenü
+
+- **Jedes Löschen fragt nach** (`useDeleteConfirmation` → `ConfirmDialog`, „Löschen“ rot, Fokus darauf, Esc/
+  „Abbrechen“ ändert nichts): Türen/Fenster/Durchgänge, Raumobjekte, Möbel/Lampen (einzeln, Mehrfachauswahl,
+  Gruppe), Entf/Rücktaste, Zimmer, Etagen, Wand/Ecke im Grundriss-Editor („Entfernen“). Projekte wie bisher.
+  Der Text nennt das Element und den Hinweis auf „Rückgängig“. Gelöscht wird erst nach der Bestätigung (ein Schritt).
+- **Kontextmenü für Bauelemente** (`ui/ContextMenu`, `opening-context-menu`, Eintrag `context-delete`
+  „Löschen …“ → Abfrage): Rechtsklick auf Tür/Fenster/Durchgang im Grundriss und in „3D Bearbeiten“ (nicht in
+  der Vorschau und nicht im Grundriss-Editor) sowie auf einen Eintrag der Liste „Bauelemente“; Tastatur:
+  Kontextmenü-Taste bzw. Umschalt+F10. Der Rechtsklick wählt das Element aus. In der Szene zählt nur ein
+  Rechtsklick ohne Bewegung (`watchRightClick`) – rechts ziehen verschiebt weiter die Ansicht. Esc, Klick
+  daneben, Mausrad und Größenänderung schließen das Menü; solange Menü oder Abfrage offen sind, ruhen die Kürzel.
 
 ## Undo/Redo
 
@@ -598,7 +611,7 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
     `item()`, `openScene()`. Mehrere Zimmer: Projekt in Format 8 direkt in der Suite „building“ (Haus).
   - `e2e/lib/planner.mjs`: `addFurniture`.
   - `e2e/lib/images.mjs`: `analyzeImage`, `exportFile`.
-- **Suiten (41):**
+- **Suiten (42):**
   - Unit: Kollisionsgeometrie, Raummaße & Maßketten, L-Form, Öffnungen/Durchgang/Format 6,
     Kollisionszonen & Höhen, Platzierung/Drehen/Gruppen/Tischlampen, **Küche/Bad/Teppich & Format 7**,
     **Autosave/Recovery & Speichern unter**, **Zimmer, Etagen, gemeinsame Wände & Format 8**
@@ -611,10 +624,11 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
     **Küche, Bad, Teppich & Pflanze** (Bibliothek, Einfügen, Oberschrank, Bearbeiten, Export, 390 px),
     Visuelle Szenen
   - Gebäude: **Mehrere Zimmer, Etagen & 3D-Ziehen von Bauelementen** (gemeinsame Wand mit Tür, Nachbar
-    anklicken, umbenennen, verschieben mit Einrasten, Etagen, Fenster/Heizkörper in 3D ziehen, Speichern, Export)
+    anklicken, umbenennen, verschieben mit Einrasten, Etagen, Fenster/Heizkörper in 3D ziehen, Speichern, Export),
+    **Kontextmenü & Sicherheitsabfrage beim Löschen** (Liste, Grundriss, 3D, Tastatur, rechts ziehen, alle Abfragen)
   - Verlauf und Projekte: Undo/Redo, Lokale Projekte, **Autosave, Wiederherstellung & Speichern unter**
     (Szenarien 1–10 inkl. Speicher voll), Speicherkompatibilität (Format 1–8)
   - Performance: Performance (inkl. 150 gemischte Küchen-/Bad-Objekte + 10 Lampen), **Rendern auf Anforderung**
   - V1-Abnahme: Export, Mobile/Tablet/Touch, Fehlerbehandlung & Robustheit, Accessibility,
     Visuelle Endabnahme (5 Projekte × 3 Geräte)
-- **Aktueller Stand:** **2158/2158 Tests in 41 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.
+- **Aktueller Stand:** **2188/2188 Tests in 42 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.

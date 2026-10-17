@@ -150,6 +150,7 @@ await props.getByLabel('Wand').selectOption('south'); await settle();
 await setIn(props, 'Abstand von links', '3,2');
 check('Überschneidung mit der Tür: Warnung wie bisher', (await props.getByTestId('collision-notice').allTextContents()).some((t) => t.includes('Überschneidet sich')));
 await page.getByTestId('delete-opening').click(); await settle();
+await page.getByTestId('confirm-accept').click(); await settle();
 
 // ---------- 4. Durchgang
 await page.getByTestId('add-passage').click(); await settle();
@@ -174,6 +175,7 @@ const fp = page.getByTestId('furniture-properties');
 await setIn(fp, 'X-Position', '4,5'); await setIn(fp, 'Z-Position', '1,1');
 check('Sessel direkt vor dem Durchgang: keine Tür-Kollision', (await page.getByTestId('furniture-list-item').count()) === furnitureBefore + 1 && (await fp.getByTestId('collision-notice').count()) === 0, (await fp.getByTestId('collision-notice').allTextContents()).join(' | '));
 await page.getByTestId('delete-furniture').click(); await settle();
+await page.getByTestId('confirm-accept').click(); await settle();
 await page.getByTestId('opening-list-item').filter({ hasText: 'Durchgang 1' }).click(); await settle();
 await toggle('3D');
 const passage3d = await page.evaluate(() => {
@@ -186,6 +188,7 @@ check('3D: offene Durchgangsöffnung (kein Türblatt, kein Glas), ausgewählt um
 await shot('03-durchgang-3d');
 await toggle('2D');
 await page.getByTestId('delete-opening').click(); await settle();
+await page.getByTestId('confirm-accept').click(); await settle();
 check('Durchgang löschen: Verlauf „Durchgang löschen“', (await page.getByTestId('opening-list-item').filter({ hasText: 'Durchgang' }).count()) === 0 && (await undoTitle()) === 'Durchgang löschen rückgängig');
 await key('ControlOrMeta+z');
 check('Undo stellt den Durchgang wieder her (gleiche Lage)', (await page.getByTestId('opening-list-item').filter({ hasText: 'Durchgang 1' }).count()) === 1 && (await chain('east'))[0] === '0,60');

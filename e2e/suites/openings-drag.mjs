@@ -91,6 +91,7 @@ for (const side of ['north', 'east', 'south', 'west']) {
   check(`Tür entlang ${side}: Kamera hat nicht gepannt`, labelsBefore.every((p, i) => Math.abs(p[0] - labelsAfter[i][0]) < 0.5 && Math.abs(p[1] - labelsAfter[i][1]) < 0.5));
 }
 await page.getByTestId('delete-opening').click(); await settle(200);
+await page.getByTestId('confirm-accept').click(); await settle();
 
 // ---------- 2. Fenster entlang jeder Wand ----------
 await add('window');
@@ -101,6 +102,7 @@ for (const side of ['north', 'east', 'south', 'west']) {
   check(`Fenster entlang ${side}: Position 0,60 m`, (await wallValue()) === side && near(after, 0.6), `→ ${after.toFixed(2)}`);
 }
 await page.getByTestId('delete-opening').click(); await settle(200);
+await page.getByTestId('confirm-accept').click(); await settle();
 
 // ---------- 3. Wandwechsel ----------
 await add('door'); await setWall('north'); await setField('Abstand von links', '2');

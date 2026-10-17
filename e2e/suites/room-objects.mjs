@@ -185,12 +185,14 @@ await shot('03-fixtures-3d');
 await toggle('2D');
 // Löschen
 await key('Delete');
+await page.getByTestId('confirm-accept').click(); await settle();
 check('Entf löscht den ausgewählten Schalter', JSON.stringify((await fixtureInfo()).map((f) => f.type).sort()) === '["radiator","socket"]');
 check('Verlauf: „Lichtschalter löschen“', (await undoTitle()) === 'Lichtschalter löschen rückgängig');
 await key('ControlOrMeta+z');
 check('Undo stellt ihn wieder her', (await fixtureInfo()).length === 3);
 await selectFixture('Steckdose 1');
 await fx.getByTestId('delete-fixture').click(); await settle();
+await page.getByTestId('confirm-accept').click(); await settle();
 check('„Steckdose löschen“-Button', (await fixtureInfo()).length === 2 && (await fx.count()) === 0);
 await key('ControlOrMeta+z');
 

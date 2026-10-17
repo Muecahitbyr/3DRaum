@@ -57,6 +57,7 @@ const SUITES = [
   { file: 'suites/lamps.mjs', name: 'Lampen & Möbelfarben', server: 'dev' },
   { file: 'suites/kitchen-bath.mjs', name: 'Küche, Bad, Teppich & Pflanze', server: 'dev' },
   { file: 'suites/building.mjs', name: 'Mehrere Zimmer, Etagen & 3D-Ziehen von Bauelementen', server: 'dev' },
+  { file: 'suites/delete-confirm.mjs', name: 'Kontextmenü & Sicherheitsabfrage beim Löschen', server: 'dev' },
   { file: 'suites/visual-scenes.mjs', name: 'Visuelle Szenen', server: 'dev' },
   { file: 'suites/performance.mjs', name: 'Performance (Rerenders)', server: 'dev' },
   { file: 'suites/render-on-demand.mjs', name: 'Rendern auf Anforderung', server: 'dev' },

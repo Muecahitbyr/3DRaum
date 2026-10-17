@@ -207,6 +207,7 @@ await setRoom(0, '5');
 // ---------- 9. Löschen ----------
 await listItems().nth(2).click(); await settle(100);
 await page.getByTestId('delete-furniture').click(); await settle(250);
+await page.getByTestId('confirm-accept').click(); await settle();
 check('Löschen: Sofa aus Liste und Szene entfernt', (await listItems().count()) === 3 && !(await ids()).includes(idOf.sofa));
 check('Nach Löschen keine Auswahl', (await selectedFurniture()) === null);
 

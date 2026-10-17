@@ -263,6 +263,7 @@ async function measureFrames() {
     await page.getByTestId('furniture-list-item').filter({ hasText: `Objekt ${i + 1}` }).first().click(); await settle(150);
     await page.keyboard.press('ControlOrMeta+d'); await settle(300);
     await page.keyboard.press('Delete'); await settle(300);
+    await page.getByTestId('confirm-accept').click(); await settle(300);
   }
   await page.keyboard.press('Escape'); await settle(1000);
   const mem1 = await memory();

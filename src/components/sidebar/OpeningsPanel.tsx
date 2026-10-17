@@ -16,9 +16,11 @@ interface OpeningsPanelProps {
   room: RoomModel;
   onAdd: (type: OpeningType) => void;
   onSelect: (id: string) => void;
+  /** Rechtsklick (bzw. Kontextmenü-Taste) auf einen Eintrag: Menü an dieser Bildschirmposition. */
+  onContextMenu?: (id: string, x: number, y: number) => void;
 }
 
-export function OpeningsPanel({ openings, selectedOpeningId, severityById, room, onAdd, onSelect }: OpeningsPanelProps) {
+export function OpeningsPanel({ openings, selectedOpeningId, severityById, room, onAdd, onSelect, onContextMenu }: OpeningsPanelProps) {
   return (
     <SidebarSection title="Bauelemente" testId="openings-panel">
       <div className={styles.actions3}>
@@ -40,6 +42,28 @@ export function OpeningsPanel({ openings, selectedOpeningId, severityById, room,
                 className={styles.item}
                 aria-pressed={opening.id === selectedOpeningId}
                 onClick={() => onSelect(opening.id)}
+                onContextMenu={
+                  onContextMenu
+                    ? (event) => {
+                        event.preventDefault();
+                        // Tastatur (Kontextmenü-Taste, Umschalt+F10): keine Zeigerposition → am Eintrag.
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        const keyboard = event.clientX === 0 && event.clientY === 0;
+                        onContextMenu(opening.id, keyboard ? rect.left + 24 : event.clientX, keyboard ? rect.bottom : event.clientY);
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  onContextMenu
+                    ? (event) => {
+                        // Kontextmenü-Taste bzw. Umschalt+F10: Menü am Eintrag.
+                        if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return;
+                        event.preventDefault();
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        onContextMenu(opening.id, rect.left + 24, rect.bottom);
+                      }
+                    : undefined
+                }
                 data-testid="opening-list-item"
               >
                 <OpeningIcon type={opening.type} />

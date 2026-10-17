@@ -325,6 +325,8 @@ check('Ecke einfügen: sechs Wände, neue Ecke ausgewählt', (await room()).wall
 await dragCorner('wall-6', { x: 2.5, z: -0.8 });
 check('Neue Ecke ziehen: Raum wird zum Fünfeck mit Spitze', (await room()).polygon.some((q) => q.z === 0 && q.x === 2.5) || (await room()).polygon.length === 6);
 await page.getByTestId('corner-properties').getByTestId('corner-remove').click(); await settle();
+check('Ecke entfernen: erst Sicherheitsabfrage „Ecke entfernen?“', (await page.getByTestId('confirm-dialog').textContent()).includes('Ecke entfernen?'));
+await page.getByTestId('confirm-accept').click(); await settle();
 check('Ecke entfernen: wieder fünf Wände', (await room()).walls.length === 5 && (await undoTitle()) === 'Ecke entfernen rückgängig');
 // Wand entfernen (schräge Wand → Nachbarn verlängert)
 {
@@ -333,13 +335,15 @@ check('Ecke entfernen: wieder fünf Wände', (await room()).walls.length === 5 &
 }
 check('Schräge Wand ausgewählt', (await wp.count()) === 1 && (await wp.textContent()).includes('Wand 3'));
 await wp.getByTestId('wall-remove').click(); await settle();
+await page.getByTestId('confirm-accept').click(); await settle();
 rm = await room();
 check('Wand entfernen: Nachbarwände bis zur Ecke verlängert (4 Wände, Ecke 5/4)', rm.walls.length === 4 && rm.polygon.some((q) => q.x === 5 && q.z === 4), JSON.stringify(rm.polygon));
 await key('ControlOrMeta+z');
 // Entf auf Ecke
 await page.locator('[data-testid="room-corner"][data-wall-id="wall-4"]').click(); await settle();
 await key('Delete');
-check('Entf auf ausgewählter Ecke entfernt sie', (await room()).walls.length === 4);
+await page.getByTestId('confirm-accept').click(); await settle();
+check('Entf auf ausgewählter Ecke entfernt sie (nach Abfrage)', (await room()).walls.length === 4);
 await key('ControlOrMeta+z');
 check('Möbel nach allen Änderungen innerhalb der Kontur', await page.evaluate(async () => {
   const m = await import('/src/utils/polygon.ts');
@@ -360,6 +364,7 @@ await roomPanel.getByTestId('room-edit-toggle').click(); await settle(400);
   await page.mouse.click(a.x, a.y); await settle();
 }
 await wp.getByTestId('wall-remove').click(); await settle();
+await page.getByTestId('confirm-accept').click(); await settle();
 check('L-Form: Wand mit parallelen Nachbarn → verständliche Rückmeldung, nichts geändert', (await page.getByTestId('room-feedback').textContent()).includes('parallel') && (await room()).walls.length === 6);
 await setIn(wp, 'Länge', '3');
 check('L-Form: Wandlänge der Innenwand ändern (Aussparung 3,00 m breit)', (await labels()).filter((l) => l === '3,00 m').length >= 1 && (await room()).walls.length === 6);

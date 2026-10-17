@@ -33,13 +33,15 @@ interface OpeningElementProps extends OpeningPartProps {
   /** `false`, solange die zugehörige Wand in 3D ausgeblendet ist – dann keine Klicks/Hover. */
   interactive?: boolean;
   onSelect: (id: string) => void;
+  /** Rechtsklick ohne Ziehen: Kontextmenü (Bildschirmposition). Rechts ziehen bleibt der Kamera. */
+  onContextMenu?: ((id: string, x: number, y: number) => void) | null;
 }
 
 /**
  * Tür, Fenster oder Durchgang im lokalen Wand-Koordinatensystem. Kümmert sich um Auswahl und
  * Hover; die eigentliche Darstellung übernehmen die Modell- bzw. Grundriss-Komponenten.
  */
-export function OpeningElement({ opening, variant, onSelect, interactive = true, ...partProps }: OpeningElementProps) {
+export function OpeningElement({ opening, variant, onSelect, onContextMenu = null, interactive = true, ...partProps }: OpeningElementProps) {
   const isPlan = variant === 'plan';
   const drag = useOpeningDrag();
   const [hovered, setHovered] = useState(false);
@@ -54,6 +56,13 @@ export function OpeningElement({ opening, variant, onSelect, interactive = true,
   // Linke Maustaste bzw. Finger greift das Element (Auswahl + Ziehen entlang der Wände).
   // Andere Tasten bleiben der Kamera vorbehalten.
   const handlePointerDown = (event: ThreeEvent<PointerEvent>) => {
+    if (event.button === 2 && onContextMenu) {
+      watchRightClick(event.nativeEvent, (x, y) => {
+        onSelect(opening.id);
+        onContextMenu(opening.id, x, y);
+      });
+      return;
+    }
     if (!grabbable || !drag || event.button !== 0) return;
     event.stopPropagation();
     onSelect(opening.id);
@@ -101,6 +110,19 @@ export function OpeningElement({ opening, variant, onSelect, interactive = true,
       <HitArea span={span} wall={wall} plan={isPlan} door={isDoor} raised={partProps.selected} />
     </group>
   );
+}
+
+/**
+ * Rechtsklick ohne Bewegung erkennen: Loslassen an (fast) derselben Stelle → `onClick`.
+ * Das Ereignis selbst bleibt unberührt, damit Ziehen mit rechts weiterhin die Ansicht verschiebt.
+ */
+function watchRightClick(down: PointerEvent, onClick: (x: number, y: number) => void) {
+  const onUp = (up: PointerEvent) => {
+    if (up.pointerId !== down.pointerId) return;
+    window.removeEventListener('pointerup', onUp, true);
+    if (Math.hypot(up.clientX - down.clientX, up.clientY - down.clientY) <= CLICK_DRAG_TOLERANCE_PX) onClick(up.clientX, up.clientY);
+  };
+  window.addEventListener('pointerup', onUp, true);
 }
 
 /** Unsichtbare Klickfläche über der gesamten Öffnung (auch durch die leere Öffnung hindurch). */

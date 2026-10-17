@@ -24,7 +24,7 @@ const setIn = async (label, text) => { const i = fp.getByLabel(label, { exact: t
 const place = async (x, z, r = '0') => { await setIn('Rotation', r); await setIn('X-Position', x); await setIn('Z-Position', z); await settle(100); };
 const val = (label) => fp.getByLabel(label, { exact: true }).inputValue();
 const selectByName = async (name) => { await page.getByTestId('furniture-list-item').filter({ hasText: name }).first().click(); await settle(); };
-const deleteByName = async (name) => { await selectByName(name); await page.getByTestId('delete-furniture').click(); await settle(); };
+const deleteByName = async (name) => { await selectByName(name); await page.getByTestId('delete-furniture').click(); await settle(); await page.getByTestId('confirm-accept').click(); await settle(); };
 const toggle = async (label) => { await page.getByRole('button', { name: label, exact: true }).click(); await settle(700); };
 const clickEmpty = async () => { await page.mouse.click(1390, 880); await settle(); };
 const undoTitle = async () => (await page.getByTestId('history-undo').getAttribute('title')).replace(/ \(.*\)$/, '');

@@ -88,6 +88,8 @@ interface PlannerCanvasProps {
   onActivateRoom?: (id: string) => void;
   /** Grundriss-Editor: aktives Zimmer im Gebäude verschieben (linke/obere Innenecke, Welt). */
   onMoveRoom?: (position: FloorPoint) => void;
+  /** Rechtsklick auf eine Tür/ein Fenster/einen Durchgang: Kontextmenü (Bildschirmposition). */
+  onOpeningContextMenu?: (id: string, x: number, y: number) => void;
 }
 
 /**
@@ -136,6 +138,7 @@ export function PlannerCanvas({
   building = null,
   onActivateRoom = noop,
   onMoveRoom,
+  onOpeningContextMenu,
 }: PlannerCanvasProps) {
   // Mehrere Zimmer: Eingepasst wird auf die ganze Etage.
   const floorFit = building?.floorFitShape ?? null;
@@ -227,6 +230,8 @@ export function PlannerCanvas({
           onSelectWall={editing ? onSelectWall : null}
           variant={isPlan ? 'plan' : 'model'}
           shares={building?.activeShares}
+          // Nicht in der Vorschau (reine Ansicht) und nicht im Grundriss-Editor.
+          onOpeningContextMenu={previewing || editing ? null : onOpeningContextMenu}
         />
       </OpeningDragProvider>
       {editing && (

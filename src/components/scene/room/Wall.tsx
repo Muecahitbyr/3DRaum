@@ -50,6 +50,8 @@ interface WallProps {
    * entfallen; dessen Türen/Fenster durchbrechen diese Wand.
    */
   share?: WallShare | null;
+  /** Rechtsklick auf eine Tür/ein Fenster/einen Durchgang: Kontextmenü. */
+  onOpeningContextMenu?: ((id: string, x: number, y: number) => void) | null;
 }
 
 export function Wall({
@@ -68,6 +70,7 @@ export function Wall({
   finish = 'matte',
   fade = true,
   share = null,
+  onOpeningContextMenu = null,
 }: WallProps) {
   const { length } = wall;
   const isPlan = variant === 'plan';
@@ -214,6 +217,7 @@ export function Wall({
           status={severityById.get(opening.id) ?? null}
           interactive={interactive}
           onSelect={onSelectOpening}
+          onContextMenu={onOpeningContextMenu}
         />
       ))}
     </group>

@@ -89,6 +89,7 @@ check('Redo Drehen: 90°', (await val(fp, 'Rotation')) === '90');
 
 // ---------- 3. Löschen und wiederherstellen ----------
 await page.getByTestId('delete-furniture').click(); await settle(200);
+await page.getByTestId('confirm-accept').click(); await settle();
 h = await hist();
 check('Löschen → „Möbel löschen rückgängig“', (await items('furniture').count()) === 0 && h.undo === 'Möbel löschen rückgängig');
 await undo();
@@ -123,6 +124,7 @@ check('Fenster auf andere Wand → „Fenster verschieben“', (await hist()).un
 await undo();
 check('Undo: Fenster wieder an der Nordwand', (await op.getByLabel('Wand').inputValue()) === 'north');
 await page.getByTestId('delete-opening').click(); await settle();
+await page.getByTestId('confirm-accept').click(); await settle();
 check('Fenster löschen → „Fenster löschen“', (await hist()).undo === 'Fenster löschen rückgängig');
 await undo();
 check('Undo: Fenster wiederhergestellt', (await items('opening').count()) === 2);

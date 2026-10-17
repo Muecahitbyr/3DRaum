@@ -40,6 +40,8 @@ interface RoomProps {
   shares?: ReadonlyMap<string, WallShare> | null;
   /** Objektname der Gruppe (Nachbarzimmer heißen anders als das bearbeitete „room“). */
   name?: string;
+  /** Rechtsklick auf eine Tür/ein Fenster/einen Durchgang: Kontextmenü (nur bearbeitetes Zimmer). */
+  onOpeningContextMenu?: ((id: string, x: number, y: number) => void) | null;
 }
 
 /** Boden und Wände aus dem Raumumriss (beliebige geschlossene Form). */
@@ -60,6 +62,7 @@ export function Room({
   showCeiling = false,
   shares = null,
   name = 'room',
+  onOpeningContextMenu = null,
 }: RoomProps) {
   const openingsByWall = useStableByWall(openings);
   const fixturesByWall = useStableByWall(fixtures);
@@ -87,6 +90,7 @@ export function Room({
           onSelectFixture={onSelectFixture}
           onSelectWall={onSelectWall}
           share={shares?.get(wall.id) ?? null}
+          onOpeningContextMenu={onOpeningContextMenu}
         />
       ))}
     </group>

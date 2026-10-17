@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { COPY_OFFSET, groupsWithin, type FurnitureClipboard, type PlannerState } from '../state/plannerState';
+import { COPY_OFFSET, groupsWithin, type FurnitureClipboard, type PlannerState, type Selection } from '../state/plannerState';
 import type { usePlanner } from './usePlanner';
 
 type Planner = ReturnType<typeof usePlanner>;
@@ -29,14 +29,17 @@ const KEYBOARD_MOVE = 'keyboard-move';
 /**
  * Tastenkürzel für die Bearbeitung:
  * - Strg/⌘ + D duplizieren, Strg/⌘ + C/V kopieren/einfügen (Möbel inkl. Gruppen)
- * - Entf/Rücktaste löscht die Auswahl (Möbel, Tür/Fenster, Raumobjekt, Ecke/Wand im Grundriss-Editor)
+ * - Entf/Rücktaste löscht die Auswahl nach Sicherheitsabfrage (`onDelete`: Möbel, Tür/Fenster, Raumobjekt,
+ *   Ecke/Wand im Grundriss-Editor)
  * - Pfeiltasten verschieben ausgewählte Möbel um 1 cm, mit Shift um 10 cm
  * Nicht aktiv in Eingabefeldern oder bei offenem Dialog.
  */
-export function useEditingShortcuts(planner: Planner, enabled: boolean) {
+export function useEditingShortcuts(planner: Planner, enabled: boolean, onDelete: (selection: Selection) => void) {
   const latest = useRef(planner);
+  const deleteRef = useRef(onDelete);
   useLayoutEffect(() => {
     latest.current = planner;
+    deleteRef.current = onDelete;
   });
   const clipboard = useRef<{ data: FurnitureClipboard; pastes: number } | null>(null);
 
@@ -82,11 +85,7 @@ export function useEditingShortcuts(planner: Planner, enabled: boolean) {
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (!selection) return;
         event.preventDefault();
-        if (selection.kind === 'furniture') actions.removeFurnitureMany(selection.ids);
-        else if (selection.kind === 'opening') actions.removeOpening(selection.id);
-        else if (selection.kind === 'fixture') actions.removeFixture(selection.id);
-        else if (selection.kind === 'corner') actions.removeCorner(selection.id);
-        else actions.removeWall(selection.id);
+        deleteRef.current(selection);
         return;
       }
 

@@ -128,13 +128,20 @@ await xInput.blur(); await settle();
 // ---------- 4. Löschen per Tastatur ----------
 await selectByName('Stuhl 5');
 await key('Delete');
-check('Entf löscht das ausgewählte Möbel', JSON.stringify(await names()) === '["Stuhl 1","Stuhl 2","Stuhl 3","Stuhl 4"]');
+check('Entf: erst Sicherheitsabfrage „Möbel löschen?“ mit Namen', (await page.getByTestId('confirm-dialog').count()) === 1 && (await page.getByTestId('confirm-dialog').textContent()).includes('„Stuhl 5“ wird gelöscht'));
+await page.getByTestId('confirm-cancel').click(); await settle();
+check('Abbrechen: nichts gelöscht, kein Verlaufsschritt', (await names()).length === 5 && (await undoTitle()) !== 'Möbel löschen rückgängig');
+await key('Delete');
+await page.getByTestId('confirm-accept').click(); await settle();
+check('Entf + „Löschen“ löscht das ausgewählte Möbel', JSON.stringify(await names()) === '["Stuhl 1","Stuhl 2","Stuhl 3","Stuhl 4"]');
 await selectByName('Stuhl 4');
 await key('Backspace');
-check('Rücktaste löscht ebenfalls', (await names()).length === 3);
+await page.getByTestId('confirm-accept').click(); await settle();
+check('Rücktaste löscht ebenfalls (nach Abfrage)', (await names()).length === 3);
 await undo();
 check('Undo stellt „Stuhl 4“ wieder her', (await names()).includes('Stuhl 4'));
 await selectByName('Stuhl 4'); await key('Delete');
+await page.getByTestId('confirm-accept').click(); await settle();
 
 // ---------- 5. Pfeiltasten ----------
 await selectByName('Stuhl 1');
@@ -199,6 +206,8 @@ await key('ControlOrMeta+d');
 all = await items();
 check('Mehrfach duplizieren: zwei Kopien, beide ausgewählt', all.length === 5 && JSON.stringify(await selectedNames()) === '["Stuhl 4","Stuhl 5"]', JSON.stringify(all.map((i) => i.name)));
 await multi.getByTestId('delete-selection').click(); await settle();
+check('Mehrfachauswahl: Abfrage „2 Möbel löschen?“', (await page.getByTestId('confirm-dialog').textContent()).includes('2 Möbel löschen?'));
+await page.getByTestId('confirm-accept').click(); await settle();
 check('„Löschen“ im Mehrfachbereich entfernt alle ausgewählten', (await names()).length === 3 && (await selectionCount()) === 0);
 
 // ---------- 7. Auswahlrahmen ----------
@@ -255,6 +264,7 @@ await undo();
 await clickEmpty(); await clickCopy();
 check('Undo stellt die Gruppe wieder her', (await selectionCount()) === 2);
 await multi.getByTestId('delete-selection').click(); await settle();
+await page.getByTestId('confirm-accept').click(); await settle();
 check('Gelöschte Gruppe verschwindet samt Mitgliedern', (await names()).length === 3);
 
 // ---------- 9. Ausrichten ----------

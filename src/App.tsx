@@ -29,6 +29,9 @@ import { OpeningsPanel } from './components/sidebar/OpeningsPanel';
 import { RoomPanel } from './components/sidebar/RoomPanel';
 import { BuildingPanel } from './components/sidebar/BuildingPanel';
 import { useBuildingView } from './hooks/useBuildingView';
+import { useDeleteConfirmation } from './hooks/useDeleteConfirmation';
+import { ConfirmDialog } from './components/projects/ConfirmDialog';
+import { ContextMenu } from './components/ui/ContextMenu';
 import { RoomFeedback } from './components/layout/RoomFeedback';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { useCollisionReport } from './hooks/useCollisionReport';
@@ -106,9 +109,22 @@ export function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const anyDialog = modalOpen || libraryOpen || exportOpen;
+  // Löschen immer erst nach Sicherheitsabfrage; Rechtsklick auf Bauelemente öffnet ein Kontextmenü.
+  const deletion = useDeleteConfirmation(planner);
+  const [openingMenu, setOpeningMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const closeOpeningMenu = useCallback(() => setOpeningMenu(null), []);
+  const { selectOpening } = actions;
+  const openOpeningMenu = useCallback(
+    (id: string, x: number, y: number) => {
+      selectOpening(id);
+      setOpeningMenu({ id, x, y });
+    },
+    [selectOpening],
+  );
+  const menuOpening = openingMenu ? state.openings.find((o) => o.id === openingMenu.id) : undefined;
+  const anyDialog = modalOpen || libraryOpen || exportOpen || !!deletion.request || !!openingMenu;
   useHistoryShortcuts(history, !anyDialog);
-  useEditingShortcuts(planner, !anyDialog);
+  useEditingShortcuts(planner, !anyDialog, deletion.deleteSelection);
 
   // Schmale Bildschirme: Sidebar als Drawer; Auswahl im Plan öffnet ihn nicht ungefragt.
   const compact = useMediaQuery(COMPACT_QUERY);
@@ -288,12 +304,12 @@ export function App() {
             view={buildingView}
             room={room}
             onAddRoom={actions.addRoom}
-            onRemoveRoom={actions.removeRoom}
+            onRemoveRoom={deletion.deleteRoom}
             onRenameRoom={actions.renameRoom}
             onSwitchRoom={actions.switchRoom}
             onMoveRoom={actions.setRoomPosition}
             onAddFloor={actions.addFloor}
-            onRemoveFloor={actions.removeFloor}
+            onRemoveFloor={deletion.deleteFloor}
             onRenameFloor={actions.renameFloor}
             onSwitchFloor={actions.switchFloor}
           />
@@ -309,9 +325,9 @@ export function App() {
             onWallLengthChange={actions.setWallLength}
             onWallThicknessChange={actions.setWallThickness}
             onSplitWall={actions.splitWall}
-            onRemoveWall={actions.removeWall}
+            onRemoveWall={deletion.removeWall}
             onCornerMove={actions.moveCorner}
-            onRemoveCorner={actions.removeCorner}
+            onRemoveCorner={deletion.removeCorner}
           />
           <OpeningsPanel
             openings={state.openings}
@@ -320,6 +336,7 @@ export function App() {
             room={room}
             onAdd={actions.addOpening}
             onSelect={actions.selectOpening}
+            onContextMenu={openOpeningMenu}
           />
           {selectedOpening && (
             <OpeningPropertiesPanel
@@ -329,7 +346,7 @@ export function App() {
               room={room}
               collisionMessages={describeCollisions({ type: 'opening', id: selectedOpening.id }, collisions, nameOf)}
               onChange={actions.updateOpening}
-              onDelete={actions.removeOpening}
+              onDelete={deletion.deleteOpening}
               onClose={clearSelection}
             />
           )}
@@ -349,7 +366,7 @@ export function App() {
               room={room}
               collisionMessages={describeCollisions({ type: 'fixture', id: selectedFixture.id }, collisions, nameOf)}
               onChange={actions.updateFixture}
-              onDelete={actions.removeFixture}
+              onDelete={deletion.deleteFixture}
               onClose={clearSelection}
             />
           )}
@@ -369,7 +386,7 @@ export function App() {
               group={state.groups.find((g) => g.memberIds.includes(selectedFurniture.id)) ?? null}
               support={selectedSupport}
               onChange={actions.updateFurniture}
-              onDelete={actions.removeFurniture}
+              onDelete={(id) => deletion.deleteFurniture([id])}
               onDuplicate={(id) => actions.duplicateFurniture([id])}
               onAlign={(id, mode) => actions.alignFurniture([id], mode)}
               onUngroup={actions.ungroupFurniture}
@@ -383,7 +400,7 @@ export function App() {
               onGroup={actions.groupFurniture}
               onUngroup={actions.ungroupFurniture}
               onDuplicate={actions.duplicateFurniture}
-              onDelete={actions.removeFurnitureMany}
+              onDelete={deletion.deleteFurniture}
               onAlign={actions.alignFurniture}
               onRotate={actions.rotateFurnitureMany}
               onRenameGroup={actions.renameGroup}
@@ -496,10 +513,22 @@ export function App() {
           building={buildingView.multi ? buildingView : null}
           onActivateRoom={actions.switchRoom}
           onMoveRoom={actions.setRoomPosition}
+          onOpeningContextMenu={openOpeningMenu}
         />
           </ErrorBoundary>
         )}
       </Workspace>
+      {openingMenu && menuOpening && (
+        <ContextMenu
+          x={openingMenu.x}
+          y={openingMenu.y}
+          title={getOpeningDisplayName(menuOpening, state.openings)}
+          testId="opening-context-menu"
+          onClose={closeOpeningMenu}
+          items={[{ label: 'Löschen …', danger: true, testId: 'context-delete', onSelect: () => deletion.deleteOpening(menuOpening.id) }]}
+        />
+      )}
+      {deletion.request && <ConfirmDialog request={deletion.request} onClose={deletion.close} />}
       {exportOpen && <ExportDialog onExport={runExport} canRender3d={webgl} onClose={() => setExportOpen(false)} />}
       {libraryOpen && (
         <FurnitureLibrary
