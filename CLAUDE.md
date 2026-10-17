@@ -2,10 +2,11 @@
 
 Browserbasierter Raumplaner: Grundriss (Rechteck, L-Form, freie Polygone) in 2D zeichnen, Türen/Fenster/
 Durchgänge/Raumobjekte an Wände setzen, Möbel und Lampen platzieren, Materialien und Licht gestalten, in 3D
-bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdatei exportieren.
+bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdatei exportieren. Seit V1.2:
+mehrere Zimmer (Wohnungsgrundriss mit gemeinsamen Wänden) und mehrere Etagen.
 
-- **Stand:** **V1.1.0, feature-complete** (App-Version in `package.json`; unabhängig davon Projektformat 7).
-  Alle Funktionen fertig und getestet: **2065/2065 Tests in 39 Suiten** grün.
+- **Stand:** **V1.2.0** (App-Version in `package.json`; unabhängig davon Projektformat 8).
+  Alle Funktionen fertig und getestet: **2158/2158 Tests in 41 Suiten** grün.
 - **Repository:** https://github.com/Muecahitbyr/3DRaum.git, Branch `main`.
 - V1.1 besteht aus drei Blöcken (Details: `git log`):
   - **Block A – Maße und Grundriss:** Raumfläche/Umfang, Öffnungsmaßketten, Lagemaße mit Direkteingabe,
@@ -14,7 +15,10 @@ bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdate
     Drehen von Auswahl und Gruppe, Gruppennamen, Platzsuche neuer Möbel, Tischlampe auf Trägern.
   - **Block C – Küche, Bad und Datensicherheit:** Küchen- und Badmöbel, Teppich, Pflanze, Wandfliesen,
     Wandplatzierung, Autosave mit Wiederherstellung, „Speichern unter“, Format 7.
-- Neue Ideen nur dokumentieren (V1.2/V2), nicht auf Verdacht umsetzen.
+- **V1.2 – Gebäude und freieres Verschieben** (auf ausdrücklichen Wunsch): mehrere Zimmer je Etage
+  (Wand an Wand, gemeinsame Wände, Türen dazwischen), mehrere Etagen, Türen/Fenster/Raumobjekte auch in
+  „3D Bearbeiten“ ziehen, Format 8. Details unten unter „Gebäude: Zimmer und Etagen“.
+- Neue Ideen nur dokumentieren (V1.3/V2), nicht auf Verdacht umsetzen.
 - **Sprache:** Oberfläche, Code-Kommentare, Commits und Berichte an den Nutzer auf **Deutsch**.
   Berichte strukturiert und knapp.
 - **Ziel jetzt:** Stabilität und Qualität. Keine Features auf Verdacht und keine Umbauten ohne Anlass.
@@ -51,16 +55,17 @@ bearbeiten bzw. realistisch ansehen, lokal speichern und als PNG/PDF/Projektdate
 src/
   App.tsx                 Komposition: Layout, Sidebar-Panels, Canvas, Dialoge, Export-Ablauf
   main.tsx                Einstieg, globale ErrorBoundary (Fallback „app-error“)
-  types/                  Datenmodell: room, opening, fixture, furniture, design, view
+  types/                  Datenmodell: room, opening, fixture, furniture, design, view, building (Etagen/Zimmer)
   config/                 Kataloge und Konstanten: furniture (32 Typen), furnitureGeometry (Bauteilmaße für
                           Modelle, Plansymbole und Kollisionszonen, inkl. Küche/Spüle/Kochfeld/Wanne),
-                          fixtures, openings, design, room, scene, collision
-  state/plannerState.ts   Planungs-Reducer (alle Aktionen, Auswahl, Normalisierung)
+                          fixtures, openings, design, room, scene, collision, building
+  state/plannerState.ts   Planungs-Reducer (alle Aktionen, Auswahl, Normalisierung, Zimmer/Etagen)
+  state/ids.ts            `nextNumber` (ID-Zähler)
   state/history.ts        Undo/Redo-Wrapper mit Transaktionen
-  hooks/                  usePlanner, useProjectSession, useCollisionReport,
-                          useEditingShortcuts, useHistoryShortcuts, useMediaQuery
+  hooks/                  usePlanner, useProjectSession, useCollisionReport, useBuildingView (Nachbarzimmer,
+                          gemeinsame Wände, Etagen), useEditingShortcuts, useHistoryShortcuts, useMediaQuery
   collision/              Collider, semantische Möbelzonen (furnitureZones), Regeln, Erkennung (Broad Phase), Meldungstexte
-  projects/format.ts      Projektformat v7: Parsen, Validieren, Migrationen 1→7, `nextVariantName`
+  projects/format.ts      Projektformat v8: Parsen, Validieren, Migrationen 1→8, `nextVariantName`
   projects/storage.ts     localStorage (ein Schlüssel je Projekt)
   projects/recovery.ts    Wiederherstellungsentwurf (Autosave): eigener Schlüssel, Prüfen, Relevanz
   export/                 planImage (2D-PNG), pdf (Writer), report (Planungsbericht), files (Download/Import)
@@ -69,15 +74,19 @@ src/
   utils/                  polygon, camera, previewCamera, furniture*, furniturePlacement (Platzsuche),
                           furnitureRotation (gemeinsames Drehen), furnitureSupport (Tischlampe auf Trägern),
                           openings, fixtures, wallGeometry, units, webgl …
+  utils/building/         building (Gebäude-Helfer, Etagenhöhen, Lage), sharedWalls (gemeinsame Wände, gespiegelte
+                          Nachbaröffnungen), placement (neues Zimmer platzieren, Einrasten, Überschneidung)
   components/
     layout/               PlannerLayout (Drawer), Workspace (Toolbars), MenuButton, Fallback, HistoryControls
-    sidebar/              Panels: Raum, Öffnungen, Raumobjekte, Möbel, Eigenschaften, Mehrfachauswahl, Gestaltung
+    sidebar/              Panels: Etagen & Zimmer, Raum, Öffnungen, Raumobjekte, Möbel, Eigenschaften,
+                          Mehrfachauswahl, Gestaltung
     projects/             ProjectBar, ProjectManager, ProjectsDialog, Save-/Confirm-/RecoveryDialog
     export/ExportDialog   Export-Optionen mit Status/Fehlermeldung
     library/              Möbelbibliothek mit Vorschaubildern (eigener Canvas, frameloop 'never')
     ui/                   Button, Dialog (Fokusfalle), SegmentedControl, Text-/Maß-/Auswahlfelder
     scene/                PlannerCanvas, TopView (2D), PerspectiveView (3D), Licht, Lampen, Capture,
-                          annotations/ (Wandmaß, Öffnungsmaßkette, Lagemaße der Auswahl),
+                          BuildingContext (Nachbarzimmer, Etage darunter, Geschossdecke),
+                          annotations/ (Wandmaß, Öffnungsmaßkette, Lagemaße der Auswahl, Zimmer-Etiketten),
                           room/ (Wände, Boden, Decke, Öffnungen inkl. Durchgang, Raumobjekte, Wand-Fade),
                           furniture/ (Modelle inkl. models/Kitchen-, Bath-, DecorModels, Planssymbole,
                           Abstandsmaße, Drehgriff 2D, Drehring 3D, Grundfläche, gemeinsamer Drehgriff),
@@ -97,6 +106,10 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   wird mitverschoben, sodass die Welt fest bleibt.
 - Möbelpositionen werden in Grundrisskoordinaten gespeichert (Mittelpunkt);
   `furnitureToWorld()` rechnet in die Welt um.
+- **Mehrere Zimmer:** Jedes Zimmer hat sein eigenes Grundrisssystem; alle Zimmer einer Etage teilen die Welt.
+  Die Lage eines Zimmers im Gebäude ist allein sein `origin` (linke/obere Innenecke in der Welt = −origin,
+  `roomPositionOf`/`withRoomPosition`). Ein Zimmer verschieben ändert nur `origin` – Möbel wandern mit.
+  Die aktive Etage liegt immer bei y = 0; Etagen darunter werden mit negativem y-Versatz dargestellt.
 
 ## Raumgeometrie und freie Raumformen
 
@@ -159,6 +172,12 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - **Wand-Fade** (`useWallFade`): Wände zwischen Kamera und Raum werden pro Frame ohne React-Render
     ausgeblendet und zeitlich geglättet. Nur der Wechsel der Klickbarkeit löst ein Rendern aus.
   - Ausgeblendete Wände fangen keine Klicks ab.
+  - **Türen, Fenster, Durchgänge und Raumobjekte ziehen (V1.2):** wie Möbel – erst auswählen, dann ziehen
+    (`OpeningDragProvider` mit `mode 'model'`). Der Zeiger wird auf die Ebene der aktuellen Wand-Innenfläche
+    projiziert (das Element bleibt ruhig, auch wenn der Strahl durch die eigene Öffnung fällt); verlässt er die
+    Wand seitlich, zählt die sichtbare Wand unter dem Zeiger (Wandwechsel). Gleiche Platzierung, Einrasten und
+    Esc wie im Grundriss (`computeDragPlacement`), Einrastlinie senkrecht auf der Wand, ein Schritt je Geste.
+    Elemente an ausgeblendeten Wänden sind nicht greifbar.
 - **3D Vorschau:** Kamera auf Augenhöhe 1,6 m. Die Startposition meidet Hindernisse wie Türschwenk und
   hohe Möbel (`previewPose`) und bleibt im Raum (`keepInside`).
   - Sichtfeld 60°, im Hochformat breiter (`previewFov`: mindestens ~62° horizontal, höchstens 90° vertikal).
@@ -166,6 +185,49 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - Beim Verlassen wird die gespeicherte Bearbeitungskamera wiederhergestellt.
 - **Dev-Brücke:** Nur im Dev-Modus ist der R3F-Store unter `window.__PLANNER_R3F__()` erreichbar.
   Die E2E-Tests sind darauf angewiesen.
+
+## Gebäude: Zimmer und Etagen (V1.2)
+
+- **Datenmodell** (`types/building.ts`): `Building { floors: BuildingFloor[] (unten → oben), rooms: BuildingRoom[],
+  activeRoomId }`, `BuildingRoom { id, name, floorId, doc?: RoomDocument }`. Das **aktive Zimmer** steht wie bisher
+  direkt im Planungszustand (`room, openings, furniture, fixtures, groups, design`) und wird mit der gesamten
+  bisherigen Logik bearbeitet; sein Eintrag hat **kein** `doc`. Alle anderen Zimmer tragen ihren Inhalt im `doc`.
+  Mit einem Zimmer und einer Etage verhält sich alles exakt wie in V1.1 (keine Nachbarn, keine Liste).
+- **Aktionen** (`plannerState.ts`): `addRoom`, `removeRoom`, `renameRoom`, `switchRoom`, `setRoomPosition`,
+  `addFloor`, `removeFloor`, `renameFloor`, `switchFloor`. `switchRoom`/`switchFloor` (`NAVIGATION_ACTIONS`)
+  erzeugen **keinen** Verlaufsschritt; da jeder Stand das ganze Gebäude enthält, stellt Undo auch das Zimmer
+  wieder ein, in dem die Änderung stattfand. ID-Zähler laufen über alle Zimmer weiter (keine Doppel-IDs nach
+  Wechsel oder Undo). Letztes Zimmer/letzte Etage bleiben immer; leere Etagen entfallen. Höchstens 40 Zimmer,
+  10 Etagen (`BUILDING_CONFIG`).
+- **Neues Zimmer** (`placeNewRoom`): 4 × 3 m, Raumhöhe des aktiven Zimmers, Wand an Wand rechts/unten/links/oben
+  neben dem aktiven Zimmer (erste freie Seite, bündig mit der Innenkante, Abstand = Wandstärke → gemeinsame Wand).
+  **Neue Etage:** oben, mit einem Zimmer im Umriss des aktiven Zimmers. Formwechsel behält bei mehreren Zimmern
+  die Lage des Zimmers.
+- **Gemeinsame Wände** (`utils/building/sharedWalls.ts`): Zwei Wände verschiedener Zimmer sind gemeinsam, wenn
+  sie gegenläufig parallel liegen, sich überdecken (≥ 5 cm) und ihre Innenflächen höchstens eine Wandstärke
+  (+ 2 cm) auseinander liegen. Vorrang: aktives Zimmer, dann Reihenfolge im Gebäude. Das Zimmer mit Vorrang
+  zeichnet die Wand; beim anderen entfällt der Abschnitt (`WallShare.hidden`, bis zur Höhe der gezeichneten Wand,
+  am Wandende inkl. Gehrung). Öffnungen des anderen Zimmers in diesem Abschnitt werden gespiegelt (`mirrorOpening`:
+  gleiche Weltlage, Anschlag links ↔ rechts, Öffnungsrichtung innen ↔ außen, ID `<roomId>:<openingId>`) und
+  durchbrechen die gezeichnete Wand (`WallShare.foreign`). Diese **fremden Öffnungen** zählen auch für die
+  Kollisionen des aktiven Zimmers (`useCollisionReport(state, foreignOpenings)`: Türschwenk aus dem Nachbarzimmer,
+  Überschneidung mit eigenen Öffnungen; Text „Tür zu „Flur““). Ganz geteilte Wände erhalten im Grundriss kein
+  Wandmaß (es läge im Nachbarzimmer).
+- **Szene** (`BuildingContext`, nach dem aktiven Zimmer eingehängt, damit `getObjectByName` zuerst das aktive
+  findet): Nachbarzimmer der Etage vollständig (Wände, Öffnungen, Raumobjekte, Möbel; Gruppe `context-room-<id>`),
+  nicht bearbeitbar – ein Klick darauf wechselt in das Zimmer. In 3D zusätzlich die Etage darunter (y-Versatz =
+  Etagenhöhe), im Grundriss nur deren gestrichelter Umriss (`lower-floor-<id>`). Obere Etagen sind ausgeblendet.
+  Geschossdecke (`FloorSlab`, 25 cm) unter Zimmern oberer Etagen; Raster bleibt auf Geländehöhe.
+  Grundriss-Etiketten (`RoomLabels`: Name + Fläche, oben links im Zimmer, aktives hervorgehoben, ohne Zeigerereignisse).
+  Eingepasst wird bei mehreren Zimmern auf die ganze Etage (`floorFitShape`); Licht/Schatten umfassen die Etage.
+- **Etagenhöhe** (`floorElevations`): Summe der Etagen darunter (höchstes Zimmer) + Deckenstärke 0,25 m – abgeleitet,
+  nicht gespeichert.
+- **Verschieben:** Felder „Lage links/oben“ (linke obere Innenecke, Welt) im Bereich „Etagen & Zimmer“ oder im
+  Grundriss-Editor über den Griff „Zimmer verschieben“ (`room-move-handle`, nur bei mehreren Zimmern): rastet an
+  Außenflächen von Nachbarwänden (gemeinsame Wand) und an fluchtenden Wänden ein (`snapRoomMove`, 12 px, nur
+  achsparallele Wände). Überschneidungen werden gemeldet, nicht verhindert (`roomsOverlap`, Hinweis `room-overlap`).
+- **Sidebar „Etagen & Zimmer“** (`BuildingPanel`, oberster Bereich): Etagenauswahl (ab zwei Etagen), Zimmerliste der
+  Etage mit Fläche, „Neues Zimmer“, „Neue Etage“, Zimmer-/Etagenname, Lage, Löschen. Alles rückgängig machbar.
 
 ## Möbel, Lampen, Raumobjekte
 
@@ -282,7 +344,8 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
 ## Undo/Redo
 
 - `historyReducer` umhüllt `plannerReducer`. Gespeichert wird nur das **`PlanDocument`**
-  (`room, openings, furniture, fixtures, groups, design`); Auswahl, Kamera und Ansicht nicht. Limit 100.
+  (`room, openings, furniture, fixtures, groups, design, building`); Auswahl, Kamera und Ansicht nicht. Limit 100.
+  Zimmer-/Etagenwechsel sind kein Schritt (siehe „Gebäude“).
 - **Transaktionen:**
   - `gesture` (Ziehen/Drehen) ergibt einen Schritt; Undo ist währenddessen gesperrt.
   - `edit` (Sidebar-Feld fokussiert, `begin` bei Fokus und `end` bei Blur über `onFocusCapture/onBlurCapture`)
@@ -307,11 +370,15 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - `LEGACY_LIGHTING` (neutral, 1) entspricht exakt der alten festen Beleuchtung.
   - Kontaktschatten unter Möbeln (`ContactShadow`, eigene Ebene).
 
-## Projektformat (Version 7), Speicherung, Migration
+## Projektformat (Version 8), Speicherung, Migration
 
-- Datei/JSON: `{ format: 'raumplaner-project', version: 7, id, name, createdAt, updatedAt, plan }`.
-  `plan` enthält `{ room: {shape, height, walls}, openings, furniture, fixtures, groups, design }`.
-  `origin` wird nicht gespeichert; beim Laden wird normalisiert.
+- Datei/JSON: `{ format: 'raumplaner-project', version: 8, id, name, createdAt, updatedAt, plan }`.
+  `plan` enthält `{ room: {shape, height, walls}, openings, furniture, fixtures, groups, design, building }` –
+  `room` … `design` sind das aktive Zimmer, `building` `{ floors, rooms (andere mit `doc`), activeRoomId }`.
+  Bei **einem** Zimmer wird `origin` nicht gespeichert (beim Laden zentriert, wie bisher); bei **mehreren**
+  Zimmern behält jedes Zimmer seinen `origin` (Lage im Gebäude).
+  Defekte Zimmer werden übersprungen („n Zimmer konnten nicht gelesen werden“), ein fehlendes aktives Zimmer
+  wird ergänzt, leere Etagen entfallen.
 - `parseProject` validiert alles und gibt verständliche deutsche Fehler aus: kein JSON, fremdes Format,
   neuere Version, ungültiger Grundriss.
   Defekte Einzelelemente werden übersprungen, mit Warnung „n Elemente konnten nicht gelesen werden“.
@@ -326,8 +393,10 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
     (V1.0 lehnt Version 6 als „neuere Version“ ab).
   - 6→7: keine Datenänderung (neue Möbeltypen Küche/Bad/Teppich/Pflanze, Wandoberfläche „Fliesen“).
     Ältere Versionen lehnen Version 7 als „neuere Version“ ab, statt unbekannte Typen still zu verwerfen.
+  - 7→8: keine Datenänderung; ohne `building` entsteht beim Lesen eine Etage „Erdgeschoss“ mit „Raum 1“.
+    V1.1 lehnt Version 8 als „neuere Version“ ab (sonst gingen weitere Zimmer still verloren).
   - Alle Versionen ergeben geometrisch identische Szenen; die Suite „migrations“ prüft das.
-    Beim Speichern wird auf Version 7 gehoben.
+    Beim Speichern wird auf Version 8 gehoben.
 - **Neue Formatversion nötig?** Dann `PROJECT_FORMAT_VERSION` erhöhen, Migration ergänzen und
   Tests in `migrations.mjs` erweitern.
 - **localStorage:** Schlüssel `raumplaner:project:<id>`, je Projekt einzeln. Beschädigte Einträge
@@ -366,6 +435,9 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - Reihenfolge: Boden → Teppiche (unbeschriftet, unter Türbögen) → Wände/Öffnungen → Möbel → Oberschränke
     (gestrichelt, ohne Füllung) → Lampen. Hängt ein Oberschrank über einem Möbel, stehen beide Beschriftungen
     eine halbe Zeile versetzt übereinander (`stackedLabelShifts`), sonst wären sie deckungsgleich.
+  - **Mehrere Zimmer:** die ganze aktive Etage (`neighbors`: jedes Zimmer in seinem Grundrisssystem, ins System
+    des aktiven umgerechnet; Öffnungen nach allen Wänden, damit Türen gemeinsame Wände durchbrechen), Name und
+    Fläche je Zimmer, Wandmaße nur für das aktive Zimmer, Fußzeile „<Etage> · n Zimmer · Fläche gesamt …“.
 - **3D-PNG:** `SceneCapture` rendert einmal mit erhöhter Pixeldichte und kopiert sofort, ohne
   `preserveDrawingBuffer`. Hilfselemente (Umrandungen, Einrastlinien, Auswahlrahmen) werden dabei ausgeblendet.
   - Ist die Vorschau nicht offen, schaltet `capturePreview()` kurz in die Vorschau und stellt Ansicht und
@@ -374,6 +446,8 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   `buildReport` erzeugt Kopf, Datum, Raumdaten (inkl. Grundfläche, Umfang) und Grundriss, danach
   3D-Vorschau, Möbeltabelle (Maße in cm, Position) und die Tabelle „Türen, Fenster und Durchgänge“
   (Wand, Lage „0,80 m von links (rechts 3,30 m)“, B × H, Brüstung, Ausführung), beide mit Seitenumbrüchen.
+  Mehrere Zimmer: „Raumdaten – <Zimmer> (<Etage>)“ und am Ende die Tabelle „Zimmer und Etagen“ (Etage, Zimmer,
+  Fläche, Höhe, Möbel, Türen/Fenster; Summe der Fläche).
 - 3D-Bild für den Export: Ausgewählte Türen/Fenster/Raumobjekte (blau eingefärbt) werden für die Aufnahme
   kurz abgewählt und danach wieder ausgewählt.
 - **Projektdatei `.3draum`** (max. 5 MB):
@@ -479,7 +553,17 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - L-Form-Hauptmaße nur für den Ausschnitt rechts unten; frei bearbeitete L-Formen über den Editor.
   - Kollisionszonen nur für Esstisch, Schreibtisch, Stuhl, Bürostuhl; alle anderen sind Quader.
     Abstandsmaße übergehen ein erlaubt überdeckendes Möbel (z. B. den Tisch über dem Stuhl).
-  - In 3D wird nur ein bereits ausgewähltes Möbel gezogen (erst antippen/klicken, dann ziehen).
+  - In 3D wird nur ein bereits ausgewähltes Möbel bzw. Bauelement gezogen (erst antippen/klicken, dann ziehen);
+    Elemente an ausgeblendeten Wänden sind in 3D nicht greifbar.
+  - **Gebäude (V1.2):** Gemeinsame Wände nur bei parallelen, Rücken an Rücken liegenden Wänden; unterschiedliche
+    Wandstärken werden nicht zusammengeführt (es zeichnet das Zimmer mit Vorrang, mit seiner Stärke). An den
+    Ecken gemeinsamer Wände können sich Gehrungen beider Zimmer leicht überdecken. Kollisionen, Abstandsmaße
+    und Platzsuche gelten je Zimmer (Ausnahme: Türen/Fenster des Nachbarn in gemeinsamen Wänden); Möbel können
+    nicht in ein anderes Zimmer gezogen werden (Kopieren/Einfügen geht). Lampen in Nachbarzimmern leuchten nicht
+    (Lichtpool nur für das aktive Zimmer); die Lichtstimmung des aktiven Zimmers gilt für die ganze Szene.
+    Einrasten beim Verschieben nur an achsparallelen Wänden. Keine Treppen und keine Deckenaussparungen;
+    Etagen darüber sind ausgeblendet, die Etage darunter erscheint im Grundriss nur als Umriss.
+    Etagenhöhe ergibt sich aus dem höchsten Zimmer + 25 cm Decke (nicht frei einstellbar).
   - Gemeinsames Drehen lehnt Winkel ab, in denen die Formation nicht in den Raum passt.
   - Ohne WebGL keine 3D-Ansicht.
   - Block C: Oberschrank-Montagehöhe frei (1,00–2,40 m), keine automatische Ausrichtung an Unterschränken;
@@ -511,13 +595,13 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
 - **Hilfen:**
   - `e2e/lib/scenes.mjs`: Testprojekte (livingRoom, bedroom, lRoom, freeRoom, office; Block B: diningArea,
     officeDesk, livingCollision; Block C: kitchenScene, bathScene, livingRug), `project()`,
-    `item()`, `openScene()`.
+    `item()`, `openScene()`. Mehrere Zimmer: Projekt in Format 8 direkt in der Suite „building“ (Haus).
   - `e2e/lib/planner.mjs`: `addFurniture`.
   - `e2e/lib/images.mjs`: `analyzeImage`, `exportFile`.
-- **Suiten (39):**
+- **Suiten (41):**
   - Unit: Kollisionsgeometrie, Raummaße & Maßketten, L-Form, Öffnungen/Durchgang/Format 6,
     Kollisionszonen & Höhen, Platzierung/Drehen/Gruppen/Tischlampen, **Küche/Bad/Teppich & Format 7**,
-    **Autosave/Recovery & Speichern unter**
+    **Autosave/Recovery & Speichern unter**, **Zimmer, Etagen, gemeinsame Wände & Format 8**
   - Grundlagen: Raumgeometrie, Raum 2D/3D (Preview-Build)
   - Öffnungen: Türen & Fenster, Drag & Drop Türen/Fenster, **Maße, Durchgang & L-Form**
   - Möbel: Möbel, Drag & Drop Möbel, Möbelbibliothek, Abstandsmaße, Bearbeiten/Mehrfachauswahl/Gruppen,
@@ -526,9 +610,11 @@ e2e/  run.mjs (Runner), suites/*.mjs, lib/ (scenes, planner, images),
   - Gestaltung: Gestaltung, Gestaltung/Decke/Licht/Vorschau, Lampen & Möbelfarben,
     **Küche, Bad, Teppich & Pflanze** (Bibliothek, Einfügen, Oberschrank, Bearbeiten, Export, 390 px),
     Visuelle Szenen
+  - Gebäude: **Mehrere Zimmer, Etagen & 3D-Ziehen von Bauelementen** (gemeinsame Wand mit Tür, Nachbar
+    anklicken, umbenennen, verschieben mit Einrasten, Etagen, Fenster/Heizkörper in 3D ziehen, Speichern, Export)
   - Verlauf und Projekte: Undo/Redo, Lokale Projekte, **Autosave, Wiederherstellung & Speichern unter**
-    (Szenarien 1–10 inkl. Speicher voll), Speicherkompatibilität (Format 1–7)
+    (Szenarien 1–10 inkl. Speicher voll), Speicherkompatibilität (Format 1–8)
   - Performance: Performance (inkl. 150 gemischte Küchen-/Bad-Objekte + 10 Lampen), **Rendern auf Anforderung**
   - V1-Abnahme: Export, Mobile/Tablet/Touch, Fehlerbehandlung & Robustheit, Accessibility,
     Visuelle Endabnahme (5 Projekte × 3 Geräte)
-- **Aktueller Stand:** **2065/2065 Tests in 39 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.
+- **Aktueller Stand:** **2158/2158 Tests in 41 Suiten** grün, TypeScript und Build ohne Fehler und Warnungen.

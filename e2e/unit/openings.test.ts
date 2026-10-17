@@ -66,7 +66,7 @@ const rest = readingDistances(diagonal, onDiagonal).end;
 check('Diagonale Wand: Restabstand 25 cm auf 1 cm genau (Lage cm-genau gespeichert)', Math.abs(rest - 0.25) <= 0.005 + 1e-9, rest);
 
 // ---------- Projektformat 6 und Migration
-check('Aktuelle Formatversion 7 (Durchgang seit 6)', PROJECT_FORMAT_VERSION === 7);
+check('Aktuelle Formatversion 8 (Durchgang seit 6)', PROJECT_FORMAT_VERSION === 8);
 const walls = createRectangleRoom({ width: 5, length: 4, height: 2.5 }).walls;
 const plan5 = {
   room: { shape: 'rectangle', height: 2.5, walls },

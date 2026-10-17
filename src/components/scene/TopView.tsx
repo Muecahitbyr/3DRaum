@@ -28,6 +28,8 @@ interface TopViewProps {
   fitKey: string;
   /** Zusätzliche Grundriss-Inhalte mit zoomabhängigem Maßstab (z. B. Abstandsmaße). */
   overlay?: (metersPerPixel: number) => ReactNode;
+  /** Wände ohne Wandmaß (gemeinsame Wände mit Nachbarzimmern). */
+  hiddenDimensionWalls?: ReadonlySet<string>;
 }
 
 /**
@@ -35,7 +37,7 @@ interface TopViewProps {
  * Verzerrung). Zoomen und Verschieben sind möglich, Drehen nicht. Beim Aktivieren
  * und bei Maßänderungen wird der Raum automatisch ins Sichtfeld eingepasst.
  */
-export function TopView({ active, room, openings, fitShape, fitKey, overlay }: TopViewProps) {
+export function TopView({ active, room, openings, fitShape, fitKey, overlay, hiddenDimensionWalls }: TopViewProps) {
   const getState = useThree((state) => state.get);
   const invalidate = useThree((state) => state.invalidate);
   const [camera, setCamera] = useState<OrthographicCameraImpl | null>(null);
@@ -94,7 +96,7 @@ export function TopView({ active, room, openings, fitShape, fitKey, overlay }: T
           onChange={() => setZoom(camera.zoom)}
         />
       )}
-      {active && <RoomDimensionLines room={room} openings={openings} metersPerPixel={1 / zoom} />}
+      {active && <RoomDimensionLines room={room} openings={openings} metersPerPixel={1 / zoom} hiddenWalls={hiddenDimensionWalls} />}
       {active && overlay?.(1 / zoom)}
     </>
   );

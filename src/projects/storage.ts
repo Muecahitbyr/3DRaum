@@ -120,6 +120,7 @@ export function saveProject({ id, name, plan }: SaveInput): StorageResult<Projec
       fixtures: plan.fixtures,
       groups: plan.groups,
       design: plan.design,
+      building: plan.building,
     },
   };
   try {

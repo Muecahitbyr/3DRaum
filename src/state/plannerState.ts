@@ -8,12 +8,25 @@ import {
   wallColorOf,
   wallFinishOf,
 } from '../config/design';
+import { BUILDING_CONFIG, floorNameFor } from '../config/building';
 import { DEFAULT_ROOM_DIMENSIONS, ROOM_DIMENSION_CONSTRAINTS } from '../config/room';
+import type { Building, BuildingRoom, RoomDocument } from '../types/building';
 import type { FloorMaterialId, HexColor, LightingSettings, RoomDesign, WallFinish } from '../types/design';
 import type { FixturePatch, FixtureType, RoomFixture } from '../types/fixture';
 import type { FurnitureGroup, FurnitureItem, FurniturePatch, FurnitureType } from '../types/furniture';
 import type { Opening, OpeningPatch, OpeningType } from '../types/opening';
 import type { FloorPoint, Meters, RoomDimensionKey, RoomPlan, RoomShape } from '../types/room';
+import {
+  activeRoomOf,
+  DEFAULT_BUILDING,
+  isMultiRoom,
+  nextNumberedName,
+  roomDocumentOf,
+  roomPositionOf,
+  roomsOnFloor,
+  withRoomPosition,
+} from '../utils/building/building';
+import { placeNewRoom } from '../utils/building/placement';
 import { sameValues } from '../utils/equality';
 import { createFixture, normalizeFixture } from '../utils/fixtures';
 import { createFurniture, normalizeFurniture } from '../utils/furniture';
@@ -42,6 +55,7 @@ import {
 } from '../utils/room/plan';
 import { remapWallItem } from '../utils/room/remap';
 import { clamp, roundToPrecision } from '../utils/units';
+import { nextNumber } from './ids';
 
 /**
  * Aktuelle Auswahl. Bei Möbeln sind mehrere möglich: `ids` enthält alle ausgewählten,
@@ -67,12 +81,19 @@ export interface PlannerState {
   groups: FurnitureGroup[];
   /** Bodenbelag und Wandfarben. */
   design: RoomDesign;
+  /**
+   * Etagen und Zimmer. Die Felder oben (`room` … `design`) sind der Inhalt des aktiven Zimmers;
+   * die übrigen Zimmer liegen mit ihrem Inhalt hier.
+   */
+  building: Building;
   selection: Selection | null;
   /** Fortlaufende Zähler für eindeutige IDs. */
   nextOpeningNumber: number;
   nextFurnitureNumber: number;
   nextFixtureNumber: number;
   nextGroupNumber: number;
+  nextRoomNumber: number;
+  nextFloorNumber: number;
   /** Rückmeldung einer abgelehnten Grundriss-Änderung (kein Teil des Plans). */
   roomFeedback: { message: string; id: number } | null;
   /** Erhöht sich, wenn ein neuer Raum angelegt wird (Kamera neu einpassen). */
@@ -135,7 +156,25 @@ export type PlannerAction =
   | { type: 'setAllWallFinishes'; finish: WallFinish }
   | { type: 'setCeilingColor'; color: HexColor }
   | { type: 'setLighting'; patch: Partial<LightingSettings> }
-  | { type: 'select'; selection: Selection | null };
+  | { type: 'select'; selection: Selection | null }
+  // ---------- Gebäude: Zimmer und Etagen
+  /** Neues Zimmer Wand an Wand neben dem aktiven (gleiche Etage); wird aktiv. */
+  | { type: 'addRoom' }
+  | { type: 'removeRoom'; id: string }
+  | { type: 'renameRoom'; id: string; name: string }
+  /** Anderes Zimmer bearbeiten (kein Verlaufsschritt). */
+  | { type: 'switchRoom'; id: string }
+  /** Lage des aktiven Zimmers: linke/obere Innenecke (Welt). */
+  | { type: 'setRoomPosition'; position: FloorPoint }
+  /** Neue Etage oben mit einem Zimmer im Umriss des aktiven Zimmers; wird aktiv. */
+  | { type: 'addFloor' }
+  | { type: 'removeFloor'; id: string }
+  | { type: 'renameFloor'; id: string; name: string }
+  /** Andere Etage bearbeiten (erstes Zimmer der Etage; kein Verlaufsschritt). */
+  | { type: 'switchFloor'; id: string };
+
+/** Aktionen, die nur das bearbeitete Zimmer bzw. die Etage wechseln – nie ein Verlaufsschritt. */
+export const NAVIGATION_ACTIONS: ReadonlySet<PlannerAction['type']> = new Set(['switchRoom', 'switchFloor']);
 
 export const initialPlannerState: PlannerState = {
   room: createRectangleRoom(DEFAULT_ROOM_DIMENSIONS),
@@ -144,11 +183,14 @@ export const initialPlannerState: PlannerState = {
   fixtures: [],
   groups: [],
   design: DEFAULT_DESIGN,
+  building: DEFAULT_BUILDING,
   selection: null,
   nextOpeningNumber: 1,
   nextFurnitureNumber: 1,
   nextFixtureNumber: 1,
   nextGroupNumber: 1,
+  nextRoomNumber: 2,
+  nextFloorNumber: 2,
   roomFeedback: null,
   layoutToken: 0,
 };
@@ -298,7 +340,9 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
 
     case 'setRoomShape': {
       const current = model(state);
-      const plan = createRoomForShape(action.shape, state.room.height, current.dimensions);
+      const template = createRoomForShape(action.shape, state.room.height, current.dimensions);
+      // Mehrere Zimmer: Das Zimmer bleibt an seiner Stelle im Gebäude (sonst springt es in die Mitte).
+      const plan = isMultiRoom(state.building) ? withRoomPosition(template, roomPositionOf(state.room)) : template;
       const next = applyRoom(state, { ok: true, plan }, { nearestFor: new Set(state.room.walls.map((w) => w.id)) });
       // Farben: einheitliche Wandfarbe wird übernommen, sonst Standardfarbe.
       const colors = new Set(state.room.walls.map((w) => wallColorOf(state.design, w.id)));
@@ -558,7 +602,184 @@ export function plannerReducer(state: PlannerState, action: PlannerAction): Plan
 
     case 'select':
       return sameSelection(state.selection, action.selection) ? state : { ...state, selection: action.selection };
+
+    case 'switchRoom':
+      return activateRoom(state, action.id);
+
+    case 'switchFloor': {
+      if (activeRoomOf(state.building).floorId === action.id) return state;
+      const first = roomsOnFloor(state.building, action.id)[0];
+      return first ? activateRoom(state, first.id) : state;
+    }
+
+    case 'addRoom':
+      return addRoom(state);
+
+    case 'removeRoom':
+      return removeRoom(state, action.id);
+
+    case 'renameRoom': {
+      const name = action.name.trimStart().slice(0, BUILDING_CONFIG.nameMaxLength);
+      const rooms = updateById(state.building.rooms, action.id, (r) => ({ ...r, name }));
+      return rooms === state.building.rooms ? state : { ...state, building: { ...state.building, rooms } };
+    }
+
+    case 'setRoomPosition': {
+      const room = withRoomPosition(state.room, action.position);
+      return room.origin.x === state.room.origin.x && room.origin.z === state.room.origin.z ? state : { ...state, room };
+    }
+
+    case 'addFloor':
+      return addFloor(state);
+
+    case 'removeFloor':
+      return removeFloor(state, action.id);
+
+    case 'renameFloor': {
+      const name = action.name.trimStart().slice(0, BUILDING_CONFIG.nameMaxLength);
+      const floors = updateById(state.building.floors, action.id, (f) => ({ ...f, name }));
+      return floors === state.building.floors ? state : { ...state, building: { ...state.building, floors } };
+    }
   }
+}
+
+// ---------- Gebäude: Zimmer und Etagen
+
+/** Inhalt des aktiven Zimmers. */
+export const activeDocumentOf = ({ room, openings, furniture, fixtures, groups, design }: PlannerState): RoomDocument => ({
+  room,
+  openings,
+  furniture,
+  fixtures,
+  groups,
+  design,
+});
+
+const withoutDoc = ({ doc: _doc, ...room }: BuildingRoom): BuildingRoom => room;
+
+/** Zähler so weiterführen, dass auch nach Zimmerwechsel und Undo keine ID doppelt vergeben wird. */
+function countersFor(state: PlannerState, doc: RoomDocument) {
+  return {
+    nextOpeningNumber: Math.max(state.nextOpeningNumber, nextNumber(doc.openings, 'opening-')),
+    nextFurnitureNumber: Math.max(state.nextFurnitureNumber, nextNumber(doc.furniture, 'furniture-')),
+    nextFixtureNumber: Math.max(state.nextFixtureNumber, nextNumber(doc.fixtures, 'fixture-')),
+    nextGroupNumber: Math.max(state.nextGroupNumber, nextNumber(doc.groups, 'group-')),
+  };
+}
+
+/** Anderes Zimmer bearbeiten: aktuellen Inhalt ins Gebäude legen, den des Ziels laden. */
+function activateRoom(state: PlannerState, id: string): PlannerState {
+  const { building } = state;
+  if (id === building.activeRoomId) return state;
+  const target = building.rooms.find((r) => r.id === id);
+  if (!target?.doc) return state;
+  const current = activeDocumentOf(state);
+  const rooms = building.rooms.map((r) => (r.id === building.activeRoomId ? { ...r, doc: current } : r.id === id ? withoutDoc(r) : r));
+  return {
+    ...state,
+    ...target.doc,
+    ...countersFor(state, target.doc),
+    building: { ...building, rooms, activeRoomId: id },
+    selection: null,
+    roomFeedback: null,
+  };
+}
+
+const feedback = (state: PlannerState, message: string): PlannerState => ({
+  ...state,
+  roomFeedback: { message, id: (state.roomFeedback?.id ?? 0) + 1 },
+});
+
+/** Leeres Zimmer mit Grundriss; Lichtstimmung wie im aktiven Zimmer (sie gilt für die ganze Szene). */
+function emptyRoom(plan: RoomPlan, lighting: RoomDesign['lighting']): RoomDocument {
+  return {
+    room: plan,
+    openings: [],
+    furniture: [],
+    fixtures: [],
+    groups: [],
+    design: { ...DEFAULT_DESIGN, wallColors: Object.fromEntries(plan.walls.map((w) => [w.id, DEFAULT_WALL_COLOR])), lighting },
+  };
+}
+
+/** Zimmer ins Gebäude einfügen und aktivieren. */
+function insertRoom(state: PlannerState, floorId: string, doc: RoomDocument, building: Building = state.building): PlannerState {
+  const id = `room-${state.nextRoomNumber}`;
+  const name = nextNumberedName('Raum', building.rooms.map((r) => r.name));
+  const next: PlannerState = {
+    ...state,
+    building: { ...building, rooms: [...building.rooms, { id, name, floorId, doc }] },
+    nextRoomNumber: state.nextRoomNumber + 1,
+  };
+  return { ...activateRoom(next, id), layoutToken: state.layoutToken + 1 };
+}
+
+function addRoom(state: PlannerState): PlannerState {
+  const { building } = state;
+  if (building.rooms.length >= BUILDING_CONFIG.maxRooms) return feedback(state, `Höchstens ${BUILDING_CONFIG.maxRooms} Zimmer je Projekt.`);
+  const active = activeDocumentOf(state);
+  const floorId = activeRoomOf(building).floorId;
+  const floorModels = roomsOnFloor(building, floorId).flatMap((r) => {
+    const doc = roomDocumentOf(building, active, r.id);
+    return doc ? [roomModelOf(doc.room)] : [];
+  });
+  const size = BUILDING_CONFIG.newRoom;
+  const position = placeNewRoom(model(state), floorModels, size);
+  const plan = withRoomPosition(createRectangleRoom({ ...size, height: state.room.height }), position);
+  return insertRoom(state, floorId, emptyRoom(plan, state.design.lighting));
+}
+
+function addFloor(state: PlannerState): PlannerState {
+  const { building } = state;
+  if (building.floors.length >= BUILDING_CONFIG.maxFloors) return feedback(state, `Höchstens ${BUILDING_CONFIG.maxFloors} Etagen je Projekt.`);
+  if (building.rooms.length >= BUILDING_CONFIG.maxRooms) return feedback(state, `Höchstens ${BUILDING_CONFIG.maxRooms} Zimmer je Projekt.`);
+  const id = `floor-${state.nextFloorNumber}`;
+  const names = building.floors.map((f) => f.name);
+  const proposal = floorNameFor(building.floors.length);
+  const name = names.includes(proposal) ? nextNumberedName('Etage', names) : proposal;
+  const floors = [...building.floors, { id, name }];
+  // Gleicher Umriss wie das aktive Zimmer – das neue Zimmer liegt genau darüber.
+  const plan: RoomPlan = { ...state.room, walls: state.room.walls.map((w) => ({ ...w })) };
+  return insertRoom({ ...state, nextFloorNumber: state.nextFloorNumber + 1 }, id, emptyRoom(plan, state.design.lighting), { ...building, floors });
+}
+
+/** Ersatz für das aktive Zimmer, wenn es entfällt: Nachbar auf derselben Etage, sonst nächste Etage. */
+function fallbackRoom(building: Building, removed: ReadonlySet<string>): string | null {
+  const active = activeRoomOf(building);
+  const remaining = building.rooms.filter((r) => !removed.has(r.id));
+  const sameFloor = remaining.filter((r) => r.floorId === active.floorId);
+  if (sameFloor.length) return sameFloor[0].id;
+  const floorIndex = building.floors.findIndex((f) => f.id === active.floorId);
+  const byDistance = [...remaining].sort(
+    (a, b) =>
+      Math.abs(building.floors.findIndex((f) => f.id === a.floorId) - floorIndex) -
+      Math.abs(building.floors.findIndex((f) => f.id === b.floorId) - floorIndex),
+  );
+  return byDistance[0]?.id ?? null;
+}
+
+/** Zimmer entfernen; leere Etagen entfallen mit. Das letzte Zimmer bleibt immer. */
+function removeRooms(state: PlannerState, ids: ReadonlySet<string>): PlannerState {
+  let next = state;
+  if (ids.has(state.building.activeRoomId)) {
+    const fallback = fallbackRoom(state.building, ids);
+    if (!fallback) return state;
+    next = activateRoom(state, fallback);
+  }
+  const rooms = next.building.rooms.filter((r) => !ids.has(r.id));
+  if (rooms.length === next.building.rooms.length || rooms.length === 0) return state;
+  const floors = next.building.floors.filter((f) => rooms.some((r) => r.floorId === f.id));
+  return { ...next, building: { ...next.building, rooms, floors }, layoutToken: state.layoutToken + 1 };
+}
+
+function removeRoom(state: PlannerState, id: string): PlannerState {
+  if (!state.building.rooms.some((r) => r.id === id)) return state;
+  return removeRooms(state, new Set([id]));
+}
+
+function removeFloor(state: PlannerState, id: string): PlannerState {
+  if (state.building.floors.length <= 1 || !state.building.floors.some((f) => f.id === id)) return state;
+  return removeRooms(state, new Set(roomsOnFloor(state.building, id).map((r) => r.id)));
 }
 
 /**

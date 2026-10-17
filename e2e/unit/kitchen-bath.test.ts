@@ -98,13 +98,13 @@ check('Schmales Bad (2 × 3): Badewanne an der Längswand (90°/270°)', [90, 27
 
 // ---------- Wandfliesen und Format 7
 check('Wandoberfläche „Fliesen“ vorhanden (glänzender als Matt)', WALL_FINISHES.tiles.label === 'Fliesen' && WALL_FINISHES.tiles.roughness < WALL_FINISHES.matte.roughness);
-check('Projektformat 7', PROJECT_FORMAT_VERSION === 7);
+check('Projektformat 8 (Küche/Bad seit 7, mehrere Zimmer seit 8)', PROJECT_FORMAT_VERSION === 8);
 const plan = { ...h.present, design: { ...h.present.design, wallFinishes: { north: 'tiles' } } };
 const file = { format: 'raumplaner-project', version: 7, id: 'k', name: 'Küche', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', plan: { room: plan.room, openings: [], furniture: plan.furniture, fixtures: [], groups: [], design: plan.design } };
 const roundtrip = parseProject(serializeProject(file as never));
 check('Speichern → Laden: alle neuen Typen und Fliesen erhalten', roundtrip.ok && roundtrip.project.plan.furniture.length === plan.furniture.length && roundtrip.project.plan.design.wallFinishes.north === 'tiles' && roundtrip.warnings.length === 0, roundtrip.ok ? roundtrip.warnings : roundtrip);
 const v6 = parseProject(JSON.stringify({ ...file, version: 6, plan: { ...file.plan, furniture: [item('sofa', 2, 2)], design: { ...plan.design, wallFinishes: {} } } }));
-check('Version 6 → 7: unverändert lesbar, auf 7 gehoben', v6.ok && v6.project.version === 7 && v6.warnings.length === 0);
+check('Version 6 → 8: unverändert lesbar, auf 8 gehoben', v6.ok && v6.project.version === 8 && v6.warnings.length === 0);
 const withRug = parseProject(JSON.stringify({ ...file, plan: { ...file.plan, furniture: [{ ...item('rug', 2, 2), height: 0.5 }] } }));
 check('Teppich: Höhe auf 0,5–3 cm begrenzt', withRug.ok && withRug.project.plan.furniture[0].height === 0.03);
 

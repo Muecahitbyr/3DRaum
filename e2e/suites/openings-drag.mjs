@@ -190,17 +190,28 @@ await page.mouse.move(r.x, r.y); await page.mouse.down({ button: 'right' }); awa
 after = await labels();
 check('Rechte Maustaste auf Element: pannt, verschiebt nicht', near(await offsetValue(), p0, 1e-9) && Math.abs(after[0][0] - before[0][0] - 50) < 3);
 
-// ---------- 8. 3D unverändert ----------
+// ---------- 8. 3D: ausgewähltes Element ziehen, sonst Kamera ----------
 await toggle('3D');
-const cam0 = await page.evaluate(() => window.__PLANNER_R3F__().camera.position.toArray());
-const scr3d = await page.evaluate((id) => {
+const screen3d = () => page.evaluate((id) => {
   const s = window.__PLANNER_R3F__(); const o = s.scene.getObjectByName(id); const hit = o.children[o.children.length - 1];
   const v = hit.getWorldPosition(s.camera.position.clone()).project(s.camera); const rr = s.gl.domElement.getBoundingClientRect();
   return { x: rr.left + ((v.x + 1) / 2) * rr.width, y: rr.top + ((1 - v.y) / 2) * rr.height };
 }, door2);
+const camPos = () => page.evaluate(() => window.__PLANNER_R3F__().camera.position.toArray());
+const cam0 = await camPos();
+let scr3d = await screen3d();
 await page.mouse.move(scr3d.x, scr3d.y); await page.mouse.down(); await page.mouse.move(scr3d.x + 120, scr3d.y, { steps: 8 }); await page.mouse.up(); await settle(800);
-const cam1 = await page.evaluate(() => window.__PLANNER_R3F__().camera.position.toArray());
-check('3D: Ziehen auf Element dreht Kamera, verschiebt Element nicht', near(await offsetValue(), p0, 1e-9) && cam0.some((v, i) => Math.abs(v - cam1[i]) > 0.05));
+const cam1 = await camPos();
+const p1 = await offsetValue();
+check('3D: ausgewähltes Element folgt dem Zeiger entlang der Wand, Kamera bleibt stehen', Math.abs(p1 - p0) > 0.2 && cam0.every((v, i) => Math.abs(v - cam1[i]) < 1e-9), `${p0} → ${p1}`);
+await page.keyboard.press('ControlOrMeta+z'); await settle(300);
+check('3D: Undo stellt die Lage wieder her', near(await offsetValue(), p0, 1e-9));
+await props.getByRole('button', { name: 'Auswahl aufheben' }).click(); await settle(300);
+scr3d = await screen3d();
+await page.mouse.move(scr3d.x, scr3d.y); await page.mouse.down(); await page.mouse.move(scr3d.x + 120, scr3d.y, { steps: 8 }); await page.mouse.up(); await settle(800);
+const cam2 = await camPos();
+await page.getByTestId('opening-list-item').nth(0).click(); await settle(150);
+check('3D: nicht ausgewähltes Element – Ziehen dreht die Kamera, Element bleibt', near(await offsetValue(), p0, 1e-9) && cam1.some((v, i) => Math.abs(v - cam2[i]) > 0.05));
 await shot('3d-after-drag');
 await toggle('2D'); await shot('final-2d');
 

@@ -220,7 +220,7 @@ await page.getByTestId('project-save').click(); await settle();
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').fill('Abstände');
 await page.getByTestId('save-project-dialog').getByLabel('Projektname').press('Enter'); await settle(200);
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
-check('Speicherformat unverändert (keine Abstandsdaten)', JSON.stringify(Object.keys(stored.plan).sort()) === JSON.stringify(['design', 'fixtures', 'furniture', 'groups', 'openings', 'room']) &&
+check('Speicherformat unverändert (keine Abstandsdaten)', JSON.stringify(Object.keys(stored.plan).sort()) === JSON.stringify(['building', 'design', 'fixtures', 'furniture', 'groups', 'openings', 'room']) &&
   stored.plan.furniture.every((f) => JSON.stringify(Object.keys(f).sort()) === JSON.stringify(['depth', 'height', 'id', 'name', 'position', 'rotationDeg', 'type', 'width'])));
 await page.reload(); await ready();
 await page.getByTestId('projects-button').click(); await settle();

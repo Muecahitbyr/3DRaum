@@ -1,11 +1,14 @@
 import { Grid } from '@react-three/drei';
 import { GRID_CONFIG, SCENE_COLORS } from '../../config/scene';
 
-/** Unendliches Orientierungsraster; knapp über dem Boden, um Z-Fighting zu vermeiden. */
-export function SceneGrid() {
+/**
+ * Unendliches Orientierungsraster; knapp über dem Boden, um Z-Fighting zu vermeiden.
+ * `groundY`: Obere Etagen – das Raster bleibt auf dem Gelände (Erdgeschoss-Boden).
+ */
+export function SceneGrid({ groundY = 0 }: { groundY?: number }) {
   return (
     <Grid
-      position={[0, 0.002, 0]}
+      position={[0, groundY + 0.002, 0]}
       infiniteGrid
       cellSize={GRID_CONFIG.cellSize}
       sectionSize={GRID_CONFIG.sectionSize}

@@ -4,7 +4,9 @@ import type { FixturePatch } from '../types/fixture';
 import type { FurniturePatch } from '../types/furniture';
 import type { Opening, OpeningPatch } from '../types/opening';
 import { sameItems, sameValues } from '../utils/equality';
-import { initialPlannerState, plannerReducer, type PlannerAction, type PlannerState } from './plannerState';
+import type { Building, RoomDocument } from '../types/building';
+import { nextNumber } from './ids';
+import { initialPlannerState, NAVIGATION_ACTIONS, plannerReducer, type PlannerAction, type PlannerState } from './plannerState';
 
 /** Maximale Anzahl gespeicherter Schritte. */
 export const HISTORY_LIMIT = 100;
@@ -13,7 +15,7 @@ export const HISTORY_LIMIT = 100;
  * Der rückgängig machbare Teil des Plans. Auswahl, Kamera, Ansicht und ID-Zähler
  * gehören bewusst nicht dazu (IDs werden nie wiederverwendet).
  */
-export type PlanDocument = Pick<PlannerState, 'room' | 'openings' | 'furniture' | 'fixtures' | 'groups' | 'design'>;
+export type PlanDocument = Pick<PlannerState, 'room' | 'openings' | 'furniture' | 'fixtures' | 'groups' | 'design' | 'building'>;
 
 export interface HistoryEntry {
   /** Bezeichnung der Änderung, z. B. „Möbel verschieben“. */
@@ -60,26 +62,43 @@ export const initialHistoryState: HistoryState = {
   transaction: null,
 };
 
-export const documentOf = ({ room, openings, furniture, fixtures, groups, design }: PlannerState): PlanDocument => ({
+export const documentOf = ({ room, openings, furniture, fixtures, groups, design, building }: PlannerState): PlanDocument => ({
   room,
   openings,
   furniture,
   fixtures,
   groups,
   design,
+  building,
 });
 
 /**
  * Gleicher Planstand nach Werten. Wichtig z. B. bei Esc während einer Geste:
  * Die Rücksetzung erzeugt neue Objekte mit den alten Werten – das ist keine Änderung.
  */
-export const sameDocument = (a: PlanDocument, b: PlanDocument) =>
+export const sameDocument = (a: PlanDocument, b: PlanDocument) => sameRoomDocument(a, b) && sameBuilding(a.building, b.building);
+
+/** Gleicher Inhalt eines Zimmers (nach Werten). */
+export const sameRoomDocument = (a: RoomDocument, b: RoomDocument) =>
   (a.room === b.room || sameValues(a.room, b.room)) &&
   sameItems(a.openings, b.openings) &&
   sameItems(a.furniture, b.furniture) &&
   sameItems(a.fixtures, b.fixtures) &&
   sameItems(a.groups, b.groups) &&
   (a.design === b.design || sameValues(a.design, b.design));
+
+/** Gleiches Gebäude: Etagen, Zimmer (Namen, Etage, Inhalt) und aktives Zimmer. */
+export function sameBuilding(a: Building, b: Building): boolean {
+  if (a === b) return true;
+  if (a.activeRoomId !== b.activeRoomId || !sameItems(a.floors, b.floors) || a.rooms.length !== b.rooms.length) return false;
+  return a.rooms.every((ra, i) => {
+    const rb = b.rooms[i];
+    if (ra === rb) return true;
+    if (ra.id !== rb.id || ra.name !== rb.name || ra.floorId !== rb.floorId) return false;
+    if (!ra.doc || !rb.doc) return !ra.doc && !rb.doc;
+    return ra.doc === rb.doc || sameRoomDocument(ra.doc, rb.doc);
+  });
+}
 
 /** Setzt einen Dokumentstand ein; eine Auswahl bleibt nur, wenn das Objekt noch existiert. */
 function restore(present: PlannerState, document: PlanDocument): PlannerState {
@@ -96,14 +115,9 @@ function restore(present: PlannerState, document: PlanDocument): PlannerState {
   return { ...present, ...document, selection: items.some((o) => o.id === selection.id) ? selection : null };
 }
 
-/** Nächste freie laufende Nummer für IDs wie `opening-7`, damit neue IDs nicht kollidieren. */
-function nextNumber(items: readonly { id: string }[], prefix: string): number {
-  let max = 0;
-  for (const { id } of items) {
-    const match = id.startsWith(prefix) ? /^\d+$/.exec(id.slice(prefix.length)) : null;
-    if (match) max = Math.max(max, Number(match[0]));
-  }
-  return max + 1;
+/** Inhalt aller Zimmer (aktives aus dem Dokument), z. B. für ID-Zähler. */
+function allRoomDocuments(document: PlanDocument): RoomDocument[] {
+  return [document, ...document.building.rooms.flatMap((r) => (r.doc ? [r.doc] : []))];
 }
 
 const pushPast = (past: HistoryEntry[], entry: HistoryEntry) => [...past, entry].slice(-HISTORY_LIMIT);
@@ -225,6 +239,24 @@ export function describeAction(action: PlannerAction, state: PlannerState): stri
     case 'selectFurniture':
     case 'selectFurnitureMany':
       return 'Auswahl';
+    case 'addRoom':
+      return 'Zimmer hinzufügen';
+    case 'removeRoom':
+      return 'Zimmer löschen';
+    case 'renameRoom':
+      return 'Zimmer umbenennen';
+    case 'setRoomPosition':
+      return 'Zimmer verschieben';
+    case 'switchRoom':
+      return 'Zimmer wechseln';
+    case 'addFloor':
+      return 'Etage hinzufügen';
+    case 'removeFloor':
+      return 'Etage löschen';
+    case 'renameFloor':
+      return 'Etage umbenennen';
+    case 'switchFloor':
+      return 'Etage wechseln';
   }
 }
 
@@ -263,10 +295,13 @@ export function historyReducer(state: HistoryState, action: PlannerAction | Hist
           ...state.present,
           ...action.document,
           selection: null,
-          nextOpeningNumber: nextNumber(action.document.openings, 'opening-'),
-          nextFurnitureNumber: nextNumber(action.document.furniture, 'furniture-'),
-          nextFixtureNumber: nextNumber(action.document.fixtures, 'fixture-'),
-          nextGroupNumber: nextNumber(action.document.groups, 'group-'),
+          // IDs über alle Zimmer eindeutig: Zähler aus allen Zimmern.
+          nextOpeningNumber: nextNumber(allRoomDocuments(action.document).flatMap((d) => d.openings), 'opening-'),
+          nextFurnitureNumber: nextNumber(allRoomDocuments(action.document).flatMap((d) => d.furniture), 'furniture-'),
+          nextFixtureNumber: nextNumber(allRoomDocuments(action.document).flatMap((d) => d.fixtures), 'fixture-'),
+          nextGroupNumber: nextNumber(allRoomDocuments(action.document).flatMap((d) => d.groups), 'group-'),
+          nextRoomNumber: nextNumber(action.document.building.rooms, 'room-'),
+          nextFloorNumber: nextNumber(action.document.building.floors, 'floor-'),
         },
         past: [],
         future: [],
@@ -301,6 +336,14 @@ export function historyReducer(state: HistoryState, action: PlannerAction | Hist
     }
 
     default: {
+      // Zimmer-/Etagenwechsel: kein Schritt. Eine offene Feldbearbeitung wird vorher abgeschlossen;
+      // die gespeicherten Stände sind vollständig – Undo stellt danach auch das Zimmer wieder ein.
+      if (NAVIGATION_ACTIONS.has(action.type)) {
+        if (state.transaction?.kind === 'gesture') return state;
+        const closed = closeTransaction(state);
+        const next = plannerReducer(closed.present, action);
+        return next === closed.present ? closed : { ...closed, present: next };
+      }
       const next = plannerReducer(state.present, action);
       if (next === state.present) return state;
       const before = documentOf(state.present);

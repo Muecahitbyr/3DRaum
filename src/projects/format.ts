@@ -14,6 +14,9 @@ import { FIXTURE_CATALOG } from '../config/fixtures';
 import { FURNITURE_CATALOG } from '../config/furniture';
 import { DEFAULT_ROOM_DIMENSIONS, ROOM_DIMENSION_CONSTRAINTS, ROOM_DIMENSION_KEYS, ROOM_LIMITS, WALL_THICKNESS } from '../config/room';
 import type { PlanDocument } from '../state/history';
+import { BUILDING_CONFIG, DEFAULT_FLOOR_NAME, DEFAULT_ROOM_NAME } from '../config/building';
+import type { Building, BuildingFloor, BuildingRoom, RoomDocument } from '../types/building';
+import { DEFAULT_BUILDING, isMultiRoom } from '../utils/building/building';
 import type { FloorMaterialId, LightingPreset, LightingSettings, RoomDesign, WallFinish } from '../types/design';
 import type { FixtureType, RoomFixture } from '../types/fixture';
 import type { FurnitureColorSlot, FurnitureGroup, FurnitureItem, FurnitureType, LampLight } from '../types/furniture';
@@ -44,8 +47,11 @@ export const PROJECT_FORMAT = 'raumplaner-project';
  * - 7: neue Möbeltypen (Küche, Bad, Teppich, Pflanze) und Wandoberfläche „Fliesen“.
  *      Ältere Leser würden diese Einträge sonst stillschweigend verwerfen; mit Version 7
  *      melden sie verständlich „neuere Version“. Bestehende Daten bleiben unverändert.
+ * - 8: mehrere Zimmer und Etagen (`plan.building`: Etagen, Zimmer mit Inhalt, aktives Zimmer).
+ *      `plan.room` … `plan.design` bleiben der Inhalt des aktiven Zimmers. Bei mehreren
+ *      Zimmern wird die Lage (`origin`) jedes Zimmers mitgespeichert.
  */
-export const PROJECT_FORMAT_VERSION = 7;
+export const PROJECT_FORMAT_VERSION = 8;
 
 /**
  * Gespeichertes Projekt. Enthält nur den Plan – keine Auswahl,
@@ -76,6 +82,7 @@ export const DEFAULT_PLAN: PlanDocument = {
   fixtures: [],
   groups: [],
   design: DEFAULT_DESIGN,
+  building: DEFAULT_BUILDING,
 };
 
 /** Migrationen: Schlüssel = Ausgangsversion, Ergebnis = Daten der nächsten Version. */
@@ -145,6 +152,8 @@ const MIGRATIONS: Record<number, (data: Record<string, unknown>) => Record<strin
   5: (data) => ({ ...data, version: 6 }),
   // 6 → 7: nur neue Möbeltypen und Wandoberfläche – alles Bestehende bleibt exakt gleich.
   6: (data) => ({ ...data, version: 7 }),
+  // 7 → 8: Gebäude mit einer Etage und einem Zimmer (der bisherige Raum) – der Raum bleibt exakt gleich.
+  7: (data) => ({ ...data, version: 8 }),
 };
 
 /** Namensvorschlag für „Speichern unter“: „Wohnzimmer“ → „Wohnzimmer Variante 2“ → „… Variante 3“. */
@@ -160,12 +169,16 @@ export function cleanProjectName(name: unknown): string {
 }
 
 /**
- * Speicherform: Der Raum ohne `origin` – die Weltlage ist Ansichtssache und wird beim
- * Öffnen neu bestimmt (Raum zentriert).
+ * Speicherform: Bei einem einzelnen Zimmer ohne `origin` – die Weltlage ist Ansichtssache und
+ * wird beim Öffnen neu bestimmt (Raum zentriert). Bei mehreren Zimmern zählt die Lage der Zimmer
+ * zueinander: Dann behält jedes Zimmer seinen `origin`.
  */
 export function serializeProject(project: ProjectFile): string {
-  const { origin: _origin, ...room } = project.plan.room;
-  return JSON.stringify({ ...project, plan: { ...project.plan, room } });
+  const { plan } = project;
+  // `building` fehlt nur in Altdaten (z. B. aus Tests mit älteren Versionen) – dann ein einzelnes Zimmer.
+  if (plan.building && isMultiRoom(plan.building)) return JSON.stringify(project);
+  const { origin: _origin, ...room } = plan.room;
+  return JSON.stringify({ ...project, plan: { ...plan, room } });
 }
 
 // ---------- defensive Leser ----------
@@ -257,7 +270,7 @@ const ROOM_SHAPES: readonly RoomShape[] = ['rectangle', 'l-shape', 'free'];
  * Raumgeometrie lesen und prüfen (geschlossen, keine Selbstüberschneidung, gültige Zahlen).
  * Ein ungültiger Grundriss macht das Projekt unlesbar – er ließe sich nicht darstellen.
  */
-function readRoom(value: unknown): { ok: true; room: RoomPlan; shift: FloorPoint } | { ok: false; error: string } {
+function readRoom(value: unknown, keepOrigin = false): { ok: true; room: RoomPlan; shift: FloorPoint } | { ok: false; error: string } {
   if (!isObject(value) || !Array.isArray(value.walls) || !finite(value.height)) return { ok: false, error: 'Die Raummaße sind ungültig.' };
   const { min, max } = ROOM_DIMENSION_CONSTRAINTS.height;
   const height = roundToPrecision(clamp(value.height, min, max));
@@ -272,12 +285,14 @@ function readRoom(value: unknown): { ok: true; room: RoomPlan; shift: FloorPoint
   }
   const shape = ROOM_SHAPES.includes(value.shape as RoomShape) ? (value.shape as RoomShape) : 'free';
   const b = boundsOf(walls.map((w) => w.start));
-  const plan: RoomPlan = { shape, walls, height, origin: { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 } };
+  // Mehrere Zimmer: gespeicherte Lage im Gebäude; sonst zentriert.
+  const saved = keepOrigin ? readPoint(value.origin) : null;
+  const plan: RoomPlan = { shape, walls, height, origin: saved ?? { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 } };
   const error = validateRoomPlan(plan);
   if (error) return { ok: false, error: `Der Grundriss ist ungültig: ${error}` };
   const normalized = normalizeRoomPlan(plan);
-  // Nach dem Verschieben liegt der Raum wieder zentriert im Weltursprung.
-  const room = { ...normalized.plan, origin: { x: (b.maxX - b.minX) / 2, z: (b.maxZ - b.minZ) / 2 } };
+  // Nach dem Verschieben liegt der Raum wieder zentriert im Weltursprung (bzw. an seiner gespeicherten Lage).
+  const room = saved ? normalized.plan : { ...normalized.plan, origin: { x: (b.maxX - b.minX) / 2, z: (b.maxZ - b.minZ) / 2 } };
   return { ok: true, room, shift: normalized.shift };
 }
 
@@ -418,25 +433,22 @@ export function parseProject(raw: string | null): ParsedProject {
   if (!id) return { ok: false, error: 'Projekt-ID fehlt.', name };
   const plan = migrated.plan;
   if (!isObject(plan)) return { ok: false, error: 'Der Plan fehlt.', id, name };
-  const roomResult = readRoom(plan.room);
-  if (!roomResult.ok) return { ok: false, error: roomResult.error, id, name };
-  const { room: roomPlan, shift } = roomResult;
-  const room = roomModelOf(roomPlan);
-
+  const rawBuilding = isObject(plan.building) ? plan.building : null;
+  // Lage der Zimmer nur bei mehreren Zimmern (sonst wie bisher zentriert).
+  const multi = !!rawBuilding && Array.isArray(rawBuilding.rooms) && rawBuilding.rooms.length > 1;
   openingDefaults.invalid = 0;
-  const openings = readList(plan.openings, (v) => readOpening(v, room));
-  const furniture = readList(plan.furniture, (v) => readFurniture(v, room, shift));
-  const fixtures = readList(plan.fixtures, (v) => readFixture(v, room));
-  const furnitureIds = new Set(furniture.items.map((f) => f.id));
-  const grouped = new Set<string>();
-  const groups = readList(plan.groups, (v) => readGroup(v, furnitureIds, grouped));
-  const design = readDesign(plan.design, roomPlan);
-  const skipped = openings.skipped + furniture.skipped + fixtures.skipped + groups.skipped;
+  const active = readRoomDocument(plan, multi);
+  if (!active.ok) return { ok: false, error: active.error, id, name };
+  const building = readBuilding(rawBuilding, multi);
+  const skipped = active.skipped + building.skipped;
   const warnings = skipped
     ? [`${skipped} ${skipped === 1 ? 'Element konnte' : 'Elemente konnten'} nicht gelesen werden und ${skipped === 1 ? 'wurde' : 'wurden'} übersprungen.`]
     : [];
+  if (building.skippedRooms) {
+    warnings.push(`${building.skippedRooms} ${building.skippedRooms === 1 ? 'Zimmer konnte' : 'Zimmer konnten'} nicht gelesen werden und ${building.skippedRooms === 1 ? 'wurde' : 'wurden'} übersprungen.`);
+  }
   if (openingDefaults.invalid) warnings.push('Einige Tür- oder Fensterdetails waren ungültig – dort gelten Standardwerte.');
-  if (design.invalid) warnings.push('Die Gestaltung war teilweise ungültig – dort gelten Standardwerte.');
+  if (active.designInvalid || building.designInvalid) warnings.push('Die Gestaltung war teilweise ungültig – dort gelten Standardwerte.');
 
   const now = new Date().toISOString();
   return {
@@ -449,14 +461,85 @@ export function parseProject(raw: string | null): ParsedProject {
       name: name ?? DEFAULT_PROJECT_NAME,
       createdAt: isoOr(migrated.createdAt, now),
       updatedAt: isoOr(migrated.updatedAt, now),
-      plan: {
-        room: roomPlan,
-        openings: openings.items,
-        furniture: furniture.items,
-        fixtures: fixtures.items,
-        groups: groups.items,
-        design: design.design,
-      },
+      plan: { ...active.doc, building: building.building },
     },
   };
+}
+
+type RoomDocumentResult = { ok: true; doc: RoomDocument; skipped: number; designInvalid: boolean } | { ok: false; error: string };
+
+/** Inhalt eines Zimmers lesen (Grundriss, Öffnungen, Möbel, Raumobjekte, Gruppen, Gestaltung). */
+function readRoomDocument(value: Obj, keepOrigin: boolean): RoomDocumentResult {
+  const roomResult = readRoom(value.room, keepOrigin);
+  if (!roomResult.ok) return roomResult;
+  const { room: roomPlan, shift } = roomResult;
+  const room = roomModelOf(roomPlan);
+  const openings = readList(value.openings, (v) => readOpening(v, room));
+  const furniture = readList(value.furniture, (v) => readFurniture(v, room, shift));
+  const fixtures = readList(value.fixtures, (v) => readFixture(v, room));
+  const furnitureIds = new Set(furniture.items.map((f) => f.id));
+  const grouped = new Set<string>();
+  const groups = readList(value.groups, (v) => readGroup(v, furnitureIds, grouped));
+  const design = readDesign(value.design, roomPlan);
+  return {
+    ok: true,
+    doc: { room: roomPlan, openings: openings.items, furniture: furniture.items, fixtures: fixtures.items, groups: groups.items, design: design.design },
+    skipped: openings.skipped + furniture.skipped + fixtures.skipped + groups.skipped,
+    designInvalid: design.invalid > 0,
+  };
+}
+
+const readName = (value: unknown, fallback: string) =>
+  typeof value === 'string' && value.trim() ? value.replace(/\s+/g, ' ').trim().slice(0, BUILDING_CONFIG.nameMaxLength) : fallback;
+
+/**
+ * Gebäude lesen. Fehlt es (Version ≤ 7), entsteht eine Etage mit dem bisherigen Raum.
+ * Ungültige Zimmer werden übersprungen (Warnung), leere Etagen entfallen; das aktive Zimmer
+ * (Inhalt in `plan.room` …) gibt es immer.
+ */
+function readBuilding(value: Obj | null, keepOrigin: boolean) {
+  let skipped = 0;
+  let skippedRooms = 0;
+  let designInvalid = false;
+  if (!value) return { building: DEFAULT_BUILDING, skipped, skippedRooms, designInvalid };
+
+  const floors: BuildingFloor[] = [];
+  for (const raw of Array.isArray(value.floors) ? value.floors : []) {
+    if (!isObject(raw) || !nonEmptyString(raw.id) || floors.some((f) => f.id === raw.id) || floors.length >= BUILDING_CONFIG.maxFloors) continue;
+    floors.push({ id: raw.id, name: readName(raw.name, DEFAULT_FLOOR_NAME) });
+  }
+  if (floors.length === 0) floors.push({ id: 'floor-1', name: DEFAULT_FLOOR_NAME });
+
+  const activeId = nonEmptyString(value.activeRoomId) ? value.activeRoomId : null;
+  const rooms: BuildingRoom[] = [];
+  for (const raw of Array.isArray(value.rooms) ? value.rooms : []) {
+    if (!isObject(raw) || !nonEmptyString(raw.id) || rooms.some((r) => r.id === raw.id) || rooms.length >= BUILDING_CONFIG.maxRooms) {
+      skippedRooms++;
+      continue;
+    }
+    const floorId = typeof raw.floorId === 'string' && floors.some((f) => f.id === raw.floorId) ? raw.floorId : floors[0].id;
+    const roomName = readName(raw.name, `Raum ${rooms.length + 1}`);
+    if (raw.id === activeId) {
+      rooms.push({ id: raw.id, name: roomName, floorId });
+      continue;
+    }
+    const doc = isObject(raw.doc) ? readRoomDocument(raw.doc, keepOrigin) : null;
+    if (!doc?.ok) {
+      skippedRooms++;
+      continue;
+    }
+    skipped += doc.skipped;
+    designInvalid ||= doc.designInvalid;
+    rooms.push({ id: raw.id, name: roomName, floorId, doc: doc.doc });
+  }
+  // Das aktive Zimmer fehlt in der Liste → als erstes Zimmer der untersten Etage ergänzen.
+  let activeRoomId = activeId && rooms.some((r) => r.id === activeId) ? activeId : null;
+  if (!activeRoomId) {
+    let n = 1;
+    while (rooms.some((r) => r.id === `room-${n}`)) n++;
+    activeRoomId = `room-${n}`;
+    rooms.unshift({ id: activeRoomId, name: DEFAULT_ROOM_NAME, floorId: floors[0].id });
+  }
+  const usedFloors = floors.filter((f) => rooms.some((r) => r.floorId === f.id));
+  return { building: { floors: usedFloors, rooms, activeRoomId } satisfies Building, skipped, skippedRooms, designInvalid };
 }

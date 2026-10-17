@@ -88,7 +88,7 @@ async function drag(from, to, { escape = false } = {}) {
 // ---------- 1. Heizkörper anlegen ----------
 check('Bereich „Raumobjekte“ mit drei Buttons', (await page.getByTestId('fixtures-panel').count()) === 1 && (await page.getByTestId('add-radiator').count()) === 1 && (await page.getByTestId('add-socket').count()) === 1 && (await page.getByTestId('add-switch').count()) === 1);
 const sectionOrder = await page.locator('aside section h2').evaluateAll((els) => els.map((e) => e.textContent));
-check('Sidebar-Reihenfolge: Raum, Bauelemente, Raumobjekte, Möbel, Gestaltung', JSON.stringify(sectionOrder) === '["Raummaße","Bauelemente","Raumobjekte","Möbel","Gestaltung"]', JSON.stringify(sectionOrder));
+check('Sidebar-Reihenfolge: Etagen & Zimmer, Raum, Bauelemente, Raumobjekte, Möbel, Gestaltung', JSON.stringify(sectionOrder) === '["Etagen & Zimmer","Raummaße","Bauelemente","Raumobjekte","Möbel","Gestaltung"]', JSON.stringify(sectionOrder));
 await page.getByTestId('add-radiator').click(); await settle();
 check('Heizkörper 1 angelegt und ausgewählt', JSON.stringify(await fixtureNames()) === '["Heizkörper 1Nord"]' && (await fx.getByTestId('fixture-name').textContent()) === 'Heizkörper 1', JSON.stringify(await fixtureNames()));
 check('Standardmaße 100 × 60 × 10 cm, 10 cm über dem Boden', (await valueOf(fx, 'Breite')) === 1 && (await valueOf(fx, 'Höhe')) === 0.6 && (await valueOf(fx, 'Tiefe')) === 0.1 && (await valueOf(fx, 'Abstand zum Boden')) === 0.1);
@@ -261,7 +261,7 @@ await page.getByTestId('save-project-dialog').getByLabel('Projektname').press('E
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
 const sDoor = stored.plan.openings.find((o) => o.type === 'door');
 const sWin = stored.plan.openings.find((o) => o.type === 'window');
-check('Gespeichert: Version 7, Raumobjekte, Anschlag/Richtung, Fensterart', stored.version === 7 && stored.plan.fixtures.length === 3 && sDoor.hinge === 'right' && sDoor.swing === 'outward' && sWin.sashes === 2 && Array.isArray(stored.plan.groups), JSON.stringify({ sDoor, sWin }));
+check('Gespeichert: Version 8, Raumobjekte, Anschlag/Richtung, Fensterart', stored.version === 8 && stored.plan.fixtures.length === 3 && sDoor.hinge === 'right' && sDoor.swing === 'outward' && sWin.sashes === 2 && Array.isArray(stored.plan.groups), JSON.stringify({ sDoor, sWin }));
 check('Gespeicherter Heizkörper vollständig', JSON.stringify(Object.keys(stored.plan.fixtures.find((f) => f.type === 'radiator')).sort()) === JSON.stringify(['depth', 'elevation', 'height', 'id', 'offset', 'type', 'wall', 'width']));
 await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
 check('Nach Neuladen: leerer Plan', (await page.getByTestId('fixture-list-item').count()) === 0);
@@ -326,7 +326,7 @@ check('Migration: unverändert geöffnet gilt als gespeichert', (await page.getB
 await page.getByTestId('add-radiator').click(); await settle();
 await page.keyboard.press('ControlOrMeta+s'); await settle(300);
 const migrated = await page.evaluate(() => JSON.parse(localStorage.getItem('raumplaner:project:alt-v2')));
-check('Nach Speichern: Version 7 mit Anschlag, Flügeln und Raumobjekt', migrated.version === 7 && migrated.plan.openings[0].hinge === 'left' && migrated.plan.openings[1].hinge === 'right' && migrated.plan.openings[2].sashes === 1 && migrated.plan.fixtures.length === 1, JSON.stringify(migrated.plan.openings));
+check('Nach Speichern: Version 8 mit Anschlag, Flügeln und Raumobjekt', migrated.version === 8 && migrated.plan.openings[0].hinge === 'left' && migrated.plan.openings[1].hinge === 'right' && migrated.plan.openings[2].sashes === 1 && migrated.plan.fixtures.length === 1, JSON.stringify(migrated.plan.openings));
 await page.getByTestId('projects-button').click(); await settle();
 await page.getByTestId('project-item').filter({ hasText: 'Altprojekt V1' }).getByTestId('project-open').click(); await settle(600);
 await selectOpening('Tür 1');

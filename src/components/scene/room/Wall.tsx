@@ -13,7 +13,8 @@ import type { Opening } from '../../../types/opening';
 import type { WallSegment } from '../../../types/room';
 import { getFixtureLocalSpan } from '../../../utils/fixtures';
 import { getOpeningLocalSpan } from '../../../utils/openings';
-import { buildWallGeometry } from '../../../utils/wallGeometry';
+import type { WallShare } from '../../../utils/building/sharedWalls';
+import { buildWallGeometry, type WallCutout } from '../../../utils/wallGeometry';
 import { FixtureElement } from './fixtures/FixtureElement';
 import { CLICK_DRAG_TOLERANCE_PX, OpeningElement } from './openings/OpeningElement';
 import type { RoomVariant } from './Room';
@@ -44,6 +45,11 @@ interface WallProps {
   selected?: boolean;
   /** … und per Klick auswählen (`null` = Editor aus). */
   onSelectWall?: ((id: string) => void) | null;
+  /**
+   * Gemeinsame Wand mit einem Nachbarzimmer: Abschnitte, die das Nachbarzimmer zeichnet,
+   * entfallen; dessen Türen/Fenster durchbrechen diese Wand.
+   */
+  share?: WallShare | null;
 }
 
 export function Wall({
@@ -61,6 +67,7 @@ export function Wall({
   onSelectWall = null,
   finish = 'matte',
   fade = true,
+  share = null,
 }: WallProps) {
   const { length } = wall;
   const isPlan = variant === 'plan';
@@ -68,6 +75,12 @@ export function Wall({
   const spans = useMemo(
     () => openings.map((opening) => ({ opening, span: getOpeningLocalSpan(opening, wall) })),
     [openings, wall],
+  );
+
+  // Gemeinsame Wand: entfallende Abschnitte und Öffnungen des Nachbarzimmers.
+  const shared = useMemo<WallCutout[]>(
+    () => (share ? [...share.hidden, ...share.foreign.map((opening) => getOpeningLocalSpan(opening, wall))] : []),
+    [share, wall],
   );
 
   // 3D: echte Öffnungen in Originalgröße. Grundriss: Öffnungen über die volle Höhe
@@ -78,11 +91,13 @@ export function Wall({
         length,
         wall.height,
         wall.thickness,
-        spans.map(({ span }) => (isPlan ? { ...span, y0: 0, y1: wall.height } : span)),
+        [...spans.map(({ span }) => span), ...shared].map((span) => (isPlan ? { ...span, y0: 0, y1: wall.height } : span)),
         { outerStart: wall.outerStart, outerEnd: wall.outerEnd },
       ),
-    [length, wall.height, wall.thickness, wall.outerStart, wall.outerEnd, spans, isPlan],
+    [length, wall.height, wall.thickness, wall.outerStart, wall.outerEnd, spans, shared, isPlan],
   );
+  // Farbstreifen im Grundriss nur dort, wo diese Wand gezeichnet wird.
+  const stripSpans = useMemo(() => visibleSpans(length, share?.hidden ?? []), [length, share]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   // Kantenzahl (gleicher Winkel-Schwellwert wie drei `Edges`) – Schlüssel für die Kantenlinien.
   const edgeCount = useMemo(() => {
@@ -162,18 +177,20 @@ export function Wall({
             three.js behält deren Segmentanzahl bei (Streulinien bzw. fehlende Kanten). */}
         {(isPlan || fade) && <Edges key={edgeCount} color={isPlan ? color : SCENE_COLORS.wallEdge} />}
       </mesh>
-      {isPlan && (
-        <mesh
-          name={`wall-${wall.id}-plan-strip`}
-          // Innenkante liegt bei lokal z = +Dicke/2; Streifen knapp über der Wandoberkante,
-          // aber unter den Tür-/Fensterflächen (die ihn in Öffnungen überdecken).
-          position={[0, wall.height + 0.004, wall.thickness / 2 - stripWidth / 2]}
-          rotation-x={-Math.PI / 2}
-        >
-          <planeGeometry args={[length, stripWidth]} />
-          <meshBasicMaterial color={wallColor} />
-        </mesh>
-      )}
+      {isPlan &&
+        stripSpans.map(([x0, x1], i) => (
+          <mesh
+            key={i}
+            name={i === 0 ? `wall-${wall.id}-plan-strip` : `wall-${wall.id}-plan-strip-${i}`}
+            // Innenkante liegt bei lokal z = +Dicke/2; Streifen knapp über der Wandoberkante,
+            // aber unter den Tür-/Fensterflächen (die ihn in Öffnungen überdecken).
+            position={[(x0 + x1) / 2, wall.height + 0.004, wall.thickness / 2 - stripWidth / 2]}
+            rotation-x={-Math.PI / 2}
+          >
+            <planeGeometry args={[x1 - x0, stripWidth]} />
+            <meshBasicMaterial color={wallColor} />
+          </mesh>
+        ))}
       {fixtures.map((fixture) => (
         <FixtureElement
           key={fixture.id}
@@ -201,4 +218,19 @@ export function Wall({
       ))}
     </group>
   );
+}
+
+/** Sichtbare Abschnitte [x0, x1] (lokal, −L/2 … L/2) ohne die von Nachbarn gezeichneten. */
+function visibleSpans(length: number, hidden: readonly WallCutout[]): [number, number][] {
+  let spans: [number, number][] = [[-length / 2, length / 2]];
+  for (const cut of hidden) {
+    spans = spans.flatMap(([a, b]): [number, number][] => {
+      if (cut.x1 <= a || cut.x0 >= b) return [[a, b]];
+      return [
+        [a, Math.max(a, cut.x0)],
+        [Math.min(b, cut.x1), b],
+      ].filter(([x0, x1]) => x1 - x0 > 1e-3) as [number, number][];
+    });
+  }
+  return spans;
 }

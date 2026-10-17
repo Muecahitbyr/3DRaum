@@ -74,9 +74,9 @@ check('Gespeichert: Name „Wohnzimmer“, Status „Gespeichert“', s.state ==
 check('Rückmeldung „„Wohnzimmer“ gespeichert.“', (await notice()) === '„Wohnzimmer“ gespeichert.');
 const stored = await page.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.startsWith('raumplaner:project:')); return JSON.parse(localStorage.getItem(k)); });
 check('Gespeichertes Format: versioniert, nur Plan (keine UI-/Kamera-Zustände)',
-  stored.format === 'raumplaner-project' && stored.version === 7 &&
+  stored.format === 'raumplaner-project' && stored.version === 8 &&
   JSON.stringify(Object.keys(stored).sort()) === JSON.stringify(['createdAt', 'format', 'id', 'name', 'plan', 'updatedAt', 'version']) &&
-  JSON.stringify(Object.keys(stored.plan).sort()) === JSON.stringify(['design', 'fixtures', 'furniture', 'groups', 'openings', 'room']),
+  JSON.stringify(Object.keys(stored.plan).sort()) === JSON.stringify(['building', 'design', 'fixtures', 'furniture', 'groups', 'openings', 'room']),
   Object.keys(stored).join(','));
 check('Gespeichert: Raum (4 Wände, 6 m breit), 2 Öffnungen, 3 Möbel inkl. Name/Rotation', stored.plan.room.walls.length === 4 && stored.plan.room.walls.find((w) => w.id === 'north').end.x - stored.plan.room.walls.find((w) => w.id === 'north').start.x === 6 && stored.plan.openings.length === 2 && stored.plan.furniture.length === 3 && stored.plan.furniture.some((f) => f.name === 'Couch' && f.rotationDeg === 90));
 

@@ -1,0 +1,31 @@
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm, 4px);
+  background: rgb(255 255 255 / 0.82);
+  color: var(--color-text);
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  box-shadow: 0 0 0 1px rgb(15 23 42 / 0.08);
+}
+
+.name {
+  font-weight: 600;
+}
+
+.area {
+  color: var(--color-text-muted);
+}
+
+.active {
+  box-shadow: 0 0 0 1.5px var(--color-accent);
+}
+
+.active .name {
+  color: var(--color-accent-text);
+}

@@ -4,6 +4,7 @@ import type { CollisionSeverity } from '../../../collision';
 import type { RoomDesign } from '../../../types/design';
 import type { RoomFixture } from '../../../types/fixture';
 import type { Opening } from '../../../types/opening';
+import type { WallShare } from '../../../utils/building/sharedWalls';
 import type { RoomModel } from '../../../utils/room/model';
 import { Ceiling } from './Ceiling';
 import { Floor } from './Floor';
@@ -35,6 +36,10 @@ interface RoomProps {
   preview?: boolean;
   /** Decke sichtbar (nur 3D). */
   showCeiling?: boolean;
+  /** Gemeinsame Wände mit Nachbarzimmern (je Wand-ID). */
+  shares?: ReadonlyMap<string, WallShare> | null;
+  /** Objektname der Gruppe (Nachbarzimmer heißen anders als das bearbeitete „room“). */
+  name?: string;
 }
 
 /** Boden und Wände aus dem Raumumriss (beliebige geschlossene Form). */
@@ -53,13 +58,15 @@ export function Room({
   variant = 'model',
   preview = false,
   showCeiling = false,
+  shares = null,
+  name = 'room',
 }: RoomProps) {
   const openingsByWall = useStableByWall(openings);
   const fixturesByWall = useStableByWall(fixtures);
 
   return (
     // userData: Grundriss für Tests/Debugging (Ursprung, Umriss in Grundrisskoordinaten).
-    <group name="room" userData={{ origin: room.origin, polygon: room.polygon, shape: room.plan.shape }}>
+    <group name={name} userData={{ origin: room.origin, polygon: room.polygon, shape: room.plan.shape }}>
       <Floor room={room} material={design.floor} variant={variant} />
       <Ceiling room={room} color={design.ceilingColor} visible={variant === 'model' && showCeiling} />
       {room.walls.map((wall) => (
@@ -79,6 +86,7 @@ export function Room({
           onSelectOpening={onSelectOpening}
           onSelectFixture={onSelectFixture}
           onSelectWall={onSelectWall}
+          share={shares?.get(wall.id) ?? null}
         />
       ))}
     </group>

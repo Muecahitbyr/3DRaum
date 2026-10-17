@@ -27,6 +27,8 @@ import { MultiSelectionPanel } from './components/sidebar/MultiSelectionPanel';
 import { OpeningPropertiesPanel } from './components/sidebar/OpeningPropertiesPanel';
 import { OpeningsPanel } from './components/sidebar/OpeningsPanel';
 import { RoomPanel } from './components/sidebar/RoomPanel';
+import { BuildingPanel } from './components/sidebar/BuildingPanel';
+import { useBuildingView } from './hooks/useBuildingView';
 import { RoomFeedback } from './components/layout/RoomFeedback';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { useCollisionReport } from './hooks/useCollisionReport';
@@ -149,7 +151,41 @@ export function App() {
     }
   };
   const runExport = async (kind: ExportKind): Promise<string> => {
-    const planInput = { room, openings: state.openings, fixtures: state.fixtures, furniture: state.furniture };
+    // Mehrere Zimmer: Grundriss der ganzen Etage, Bericht mit Übersicht aller Zimmer.
+    const floor = buildingView.floors.find((f) => f.id === buildingView.activeFloorId);
+    const planInput = {
+      room,
+      openings: state.openings,
+      fixtures: state.fixtures,
+      furniture: state.furniture,
+      ...(buildingView.multi
+        ? {
+            name: buildingView.activeRoomName,
+            floorName: floor?.name,
+            neighbors: buildingView.contextRooms
+              .filter((c) => c.sameFloor)
+              .map((c) => ({ room: c.room, openings: c.doc.openings, fixtures: c.doc.fixtures, furniture: c.doc.furniture, name: c.name })),
+          }
+        : {}),
+    };
+    const reportRooms = buildingView.multi
+      ? state.building.floors.flatMap((f) =>
+          state.building.rooms
+            .filter((r) => r.floorId === f.id)
+            .map((r) => {
+              const doc = r.id === state.building.activeRoomId ? state : r.doc;
+              return {
+                floor: f.name.trim() || 'Etage',
+                name: r.name.trim() || 'Ohne Namen',
+                area: buildingView.floors.find((x) => x.id === f.id)?.rooms.find((x) => x.id === r.id)?.area ?? 0,
+                height: doc?.room.height ?? 0,
+                furniture: doc?.furniture.length ?? 0,
+                openings: doc?.openings.length ?? 0,
+                active: r.id === state.building.activeRoomId,
+              };
+            }),
+        )
+      : undefined;
     if (kind === 'project') {
       const fileName = safeFileName(projectName, '.3draum');
       downloadBlob(projectFileBlob(projectName, plan), fileName);
@@ -168,7 +204,7 @@ export function App() {
       return fileName;
     }
     const previewImage = await capturePreview().catch(() => null);
-    const blob = await buildReport({ projectName, date: new Date(), plan, room, planImage: renderPlanImage(planInput, { maxSize: 2600 }), previewImage });
+    const blob = await buildReport({ projectName, date: new Date(), plan, room, planImage: renderPlanImage(planInput, { maxSize: 2600 }), previewImage, rooms: reportRooms });
     const fileName = safeFileName(projectName, ' – Planungsbericht.pdf');
     downloadBlob(blob, fileName);
     return fileName;
@@ -188,7 +224,9 @@ export function App() {
   };
   const startGesture = useCallback(() => begin('gesture', 'gesture'), [begin]);
   const endGesture = useCallback(() => end('gesture'), [end]);
-  const collisions = useCollisionReport(state);
+  // Gebäude: Nachbarzimmer, gemeinsame Wände und deren Türen/Fenster (auch für Kollisionen).
+  const buildingView = useBuildingView(state);
+  const collisions = useCollisionReport(state, buildingView.foreignOpenings);
 
   const nameOf = useCallback(
     (ref: ObjectRef) => {
@@ -199,9 +237,15 @@ export function App() {
         return fixture ? getFixtureDisplayName(fixture, state.fixtures) : 'einem Raumobjekt';
       }
       const opening = state.openings.find((o) => o.id === ref.id);
-      return opening ? getOpeningDisplayName(opening, state.openings) : 'einer Öffnung';
+      if (opening) return getOpeningDisplayName(opening, state.openings);
+      // Tür/Fenster eines Nachbarzimmers in einer gemeinsamen Wand.
+      const foreign = buildingView.foreignOpenings.find((o) => o.id === ref.id);
+      if (!foreign) return 'einer Öffnung';
+      const neighbor = state.building.rooms.find((r) => ref.id.startsWith(`${r.id}:`));
+      const kind = foreign.type === 'door' ? 'Tür' : foreign.type === 'window' ? 'Fenster' : 'Durchgang';
+      return neighbor ? `${kind} zu „${neighbor.name.trim() || 'Ohne Namen'}“` : kind;
     },
-    [state.furniture, state.openings, state.fixtures, room],
+    [state.furniture, state.openings, state.fixtures, state.building, buildingView.foreignOpenings, room],
   );
 
   const multiSelection = selectedFurnitureIds.length > 1;
@@ -240,6 +284,19 @@ export function App() {
           project={compact ? { name: projectName, status: STATUS_TEXT[projectStatus] } : undefined}
           onClose={compact ? closeDrawer : undefined}
         >
+          <BuildingPanel
+            view={buildingView}
+            room={room}
+            onAddRoom={actions.addRoom}
+            onRemoveRoom={actions.removeRoom}
+            onRenameRoom={actions.renameRoom}
+            onSwitchRoom={actions.switchRoom}
+            onMoveRoom={actions.setRoomPosition}
+            onAddFloor={actions.addFloor}
+            onRemoveFloor={actions.removeFloor}
+            onRenameFloor={actions.renameFloor}
+            onSwitchFloor={actions.switchFloor}
+          />
           <RoomPanel
             room={room}
             editing={roomEditing}
@@ -436,6 +493,9 @@ export function App() {
           onGestureEnd={endGesture}
           viewMode={viewMode}
           cameraFitToken={cameraFitToken}
+          building={buildingView.multi ? buildingView : null}
+          onActivateRoom={actions.switchRoom}
+          onMoveRoom={actions.setRoomPosition}
         />
           </ErrorBoundary>
         )}

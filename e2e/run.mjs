@@ -33,6 +33,7 @@ const SUITES = [
   { file: 'unit/placement.test.ts', name: 'Platzierung, Drehen, Gruppen & Tischlampen (Unit)', server: null },
   { file: 'unit/kitchen-bath.test.ts', name: 'Küche, Bad, Teppich & Format 7 (Unit)', server: null },
   { file: 'unit/recovery.test.ts', name: 'Autosave, Recovery & Speichern unter (Unit)', server: null },
+  { file: 'unit/building.test.ts', name: 'Zimmer, Etagen, gemeinsame Wände & Format 8 (Unit)', server: null },
   { file: 'suites/room-geometry.mjs', name: 'Raumgeometrie (Unit, Dev-Module)', server: 'dev' },
   { file: 'suites/room-views.mjs', name: 'Raum, 2D/3D (Produktions-Build)', server: 'preview' },
   { file: 'suites/openings.mjs', name: 'Türen & Fenster', server: 'dev' },
@@ -55,6 +56,7 @@ const SUITES = [
   { file: 'suites/appearance.mjs', name: 'Gestaltung, Decke, Licht & Vorschau', server: 'dev' },
   { file: 'suites/lamps.mjs', name: 'Lampen & Möbelfarben', server: 'dev' },
   { file: 'suites/kitchen-bath.mjs', name: 'Küche, Bad, Teppich & Pflanze', server: 'dev' },
+  { file: 'suites/building.mjs', name: 'Mehrere Zimmer, Etagen & 3D-Ziehen von Bauelementen', server: 'dev' },
   { file: 'suites/visual-scenes.mjs', name: 'Visuelle Szenen', server: 'dev' },
   { file: 'suites/performance.mjs', name: 'Performance (Rerenders)', server: 'dev' },
   { file: 'suites/render-on-demand.mjs', name: 'Rendern auf Anforderung', server: 'dev' },
@@ -62,7 +64,7 @@ const SUITES = [
   { file: 'suites/mobile.mjs', name: 'Mobile, Tablet & Touch', server: 'dev' },
   { file: 'suites/robustness.mjs', name: 'Fehlerbehandlung & Robustheit', server: 'dev' },
   { file: 'suites/accessibility.mjs', name: 'Accessibility', server: 'dev' },
-  { file: 'suites/migrations.mjs', name: 'Speicherkompatibilität (Format 1–7)', server: 'dev' },
+  { file: 'suites/migrations.mjs', name: 'Speicherkompatibilität (Format 1–8)', server: 'dev' },
   { file: 'suites/visual-final.mjs', name: 'Visuelle Endabnahme (5 Projekte × 3 Geräte)', server: 'dev' },
 ];
 

@@ -11,7 +11,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Plane, Raycaster, Vector2, Vector3 } from 'three';
+import { Plane, Raycaster, Vector2, Vector3, type Mesh, type Object3D, type PerspectiveCamera } from 'three';
 import { OPENING_DRAG_CONFIG } from '../../../config/openings';
 import { PLAN_SYMBOL_CONFIG, SCENE_COLORS } from '../../../config/scene';
 import type { FixturePatch, RoomFixture } from '../../../types/fixture';
@@ -19,19 +19,22 @@ import type { Opening, OpeningPatch } from '../../../types/opening';
 import { computeDragPlacement, measureAgainstWall } from '../../../utils/openingDrag';
 import type { WallSpanItem } from '../../../utils/openings';
 import { wallPoint, type RoomModel } from '../../../utils/room/model';
+import { WALL_FADE_CONFIG } from '../../../config/scene';
 import { clamp } from '../../../utils/units';
 
 /** Wandgebundenes Element, das entlang der Wände gezogen werden kann. */
 export type DraggableWallItem = { kind: 'opening'; item: Opening } | { kind: 'fixture'; item: RoomFixture };
 
 interface OpeningDragApi {
-  /** Startet das Ziehen eines Elements (linke Maustaste im Grundriss). */
+  /** `plan` = Grundriss (jedes Element greifbar), `model` = 3D Bearbeiten (nur ausgewählte). */
+  mode: 'plan' | 'model';
+  /** Startet das Ziehen eines Elements (linke Maustaste bzw. Finger). */
   startDrag: (target: Opening | DraggableWallItem, event: ThreeEvent<PointerEvent>) => void;
 }
 
 const OpeningDragContext = createContext<OpeningDragApi | null>(null);
 
-/** `null`, wenn Ziehen nicht verfügbar ist (z. B. in der 3D-Ansicht). */
+/** `null`, wenn Ziehen nicht verfügbar ist (z. B. in der 3D-Vorschau). */
 export function useOpeningDrag(): OpeningDragApi | null {
   return useContext(OpeningDragContext);
 }
@@ -53,6 +56,8 @@ interface DragSession {
 interface SnapGuide {
   key: string;
   points: [number, number, number][];
+  /** 3D: Strichmuster in Metern (perspektivisch), Grundriss: in Bildschirmpixeln. */
+  world?: boolean;
   /** Pixel pro Meter, damit Strichlängen in Bildschirmpixeln konstant bleiben. */
   pixelsPerMeter: number;
 }
@@ -66,6 +71,8 @@ interface PausableControls {
 
 interface OpeningDragProviderProps {
   enabled: boolean;
+  /** `model`: 3D Bearbeiten – Zeiger wird auf die Wandfläche statt auf den Boden projiziert. */
+  mode?: 'plan' | 'model';
   room: RoomModel;
   openings: readonly Opening[];
   fixtures?: readonly RoomFixture[];
@@ -87,6 +94,7 @@ const NO_FIXTURES: readonly RoomFixture[] = [];
  */
 export function OpeningDragProvider({
   enabled,
+  mode = 'plan',
   room,
   openings,
   fixtures = NO_FIXTURES,
@@ -118,7 +126,9 @@ export function OpeningDragProvider({
 
   const session = useRef<DragSession | null>(null);
   const [guide, setGuide] = useState<SnapGuide | null>(null);
-  const tools = useMemo(() => ({ raycaster: new Raycaster(), ndc: new Vector2(), hit: new Vector3() }), []);
+  const tools = useMemo(() => ({ raycaster: new Raycaster(), ndc: new Vector2(), hit: new Vector3(), plane: new Plane(), normal: new Vector3(), point: new Vector3() }), []);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   const setControlsEnabled = useCallback(
     (value: boolean) => {
@@ -168,13 +178,19 @@ export function OpeningDragProvider({
         const rect = state.gl.domElement.getBoundingClientRect();
         tools.ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
         tools.raycaster.setFromCamera(tools.ndc, state.camera);
-        if (!tools.raycaster.ray.intersectPlane(FLOOR_PLANE, tools.hit)) return;
 
         const { room: dims } = latest.current;
         const resolved = resolve(s.kind, s.id);
         if (!resolved) return endDrag();
         const { item: current, neighbors, move, alignCenters } = resolved;
-        const metersPerPixel = 1 / Math.max(state.camera.zoom, 1e-6);
+        const model3d = modeRef.current === 'model';
+        if (model3d) {
+          const frame3d = dims.wallById.get(current.wall);
+          if (!frame3d || !pointOnWalls(tools, frame3d, state.scene)) return;
+        } else if (!tools.raycaster.ray.intersectPlane(FLOOR_PLANE, tools.hit)) return;
+        const metersPerPixel = model3d
+          ? perspectiveMetersPerPixel(state.camera as PerspectiveCamera, tools.hit, state.size.height)
+          : 1 / Math.max(state.camera.zoom, 1e-6);
         const placement = computeDragPlacement(
           current,
           { x: tools.hit.x, z: tools.hit.z },
@@ -195,6 +211,15 @@ export function OpeningDragProvider({
         }
         const guideFrame = dims.wallById.get(placement.wall);
         if (!guideFrame) return;
+        if (model3d) {
+          // 3D: senkrechte Linie auf der Wand-Innenfläche.
+          const p = wallPoint(guideFrame, placement.snap.along, 0.01);
+          const key = `${placement.wall}:${placement.snap.along}:3d`;
+          setGuide((prev) =>
+            prev?.key === key ? prev : { key, points: [[p.x, 0, p.z], [p.x, guideFrame.height, p.z]], pixelsPerMeter: 1, world: true },
+          );
+          return;
+        }
         const y = dims.dimensions.height + PLAN_SYMBOL_CONFIG.lineElevation + 0.01;
         const outer = wallPoint(guideFrame, placement.snap.along, -guideFrame.thickness - 10 * metersPerPixel);
         const inner = wallPoint(guideFrame, placement.snap.along, 18 * metersPerPixel);
@@ -250,7 +275,10 @@ export function OpeningDragProvider({
   }, [enabled, endDrag]);
   useEffect(() => endDrag, [endDrag]);
 
-  const api = useMemo<OpeningDragApi | null>(() => (enabled ? { startDrag } : null), [enabled, startDrag]);
+  // Ansichtswechsel (Grundriss ↔ 3D) beendet ein laufendes Ziehen.
+  useEffect(() => endDrag(), [mode, endDrag]);
+
+  const api = useMemo<OpeningDragApi | null>(() => (enabled ? { mode, startDrag } : null), [enabled, mode, startDrag]);
 
   return (
     <OpeningDragContext.Provider value={api}>
@@ -262,11 +290,53 @@ export function OpeningDragProvider({
           color={SCENE_COLORS.selection}
           lineWidth={1.5}
           dashed
-          dashSize={4}
-          gapSize={3}
+          dashSize={guide.world ? 0.08 : 4}
+          gapSize={guide.world ? 0.06 : 3}
           dashScale={guide.pixelsPerMeter}
         />
       )}
     </OpeningDragContext.Provider>
   );
+}
+
+type DragTools = { raycaster: Raycaster; hit: Vector3; plane: Plane; normal: Vector3; point: Vector3 };
+
+/**
+ * 3D: Zeigerposition auf der Wand. Primär die Ebene der aktuellen Wand-Innenfläche – so bleibt
+ * das Element ruhig unter dem Zeiger, auch wenn der Strahl durch die eigene Öffnung fällt.
+ * Verlässt der Zeiger die Wand seitlich, zählt die sichtbare Wand unter dem Zeiger (Wandwechsel).
+ */
+function pointOnWalls(tools: DragTools, frame: RoomModel['walls'][number], scene: Object3D): boolean {
+  const { raycaster, hit, plane, normal, point } = tools;
+  normal.set(frame.inward.x, 0, frame.inward.z);
+  point.set(frame.start.x, 0, frame.start.z);
+  plane.setFromNormalAndCoplanarPoint(normal, point);
+  const onPlane = raycaster.ray.intersectPlane(plane, hit) !== null;
+  if (onPlane) {
+    const along = (hit.x - frame.start.x) * frame.axis.x + (hit.z - frame.start.z) * frame.axis.z;
+    if (along >= 0 && along <= frame.length) return true;
+  }
+  const room = scene.getObjectByName('room');
+  if (room) {
+    const bodies: Mesh[] = [];
+    room.traverse((object) => {
+      const wallGroup = object.parent;
+      if ((object as Mesh).isMesh && object.userData.wallId && (wallGroup?.userData.visibility ?? 1) >= WALL_FADE_CONFIG.interactiveThreshold) {
+        bodies.push(object as Mesh);
+      }
+    });
+    const first = raycaster.intersectObjects(bodies, false)[0];
+    if (first) {
+      hit.copy(first.point);
+      return true;
+    }
+  }
+  return onPlane;
+}
+
+/** Meter je Bildschirmpixel am Punkt (Perspektive: Entfernung und Sichtfeld). */
+function perspectiveMetersPerPixel(camera: PerspectiveCamera, at: Vector3, viewportHeight: number): number {
+  if (!camera.isPerspectiveCamera) return 1 / Math.max(camera.zoom, 1e-6);
+  const distance = camera.position.distanceTo(at);
+  return (2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(viewportHeight, 1);
 }

@@ -22,6 +22,18 @@ interface ReportInput {
   planImage: HTMLCanvasElement;
   /** 3D-Vorschau; fehlt sie (z. B. ohne WebGL), entfällt der Abschnitt. */
   previewImage: HTMLCanvasElement | null;
+  /** Mehrere Zimmer/Etagen: Übersicht aller Zimmer (Raumdaten und Listen gelten dem aktiven Zimmer). */
+  rooms?: readonly ReportRoom[];
+}
+
+export interface ReportRoom {
+  floor: string;
+  name: string;
+  area: number;
+  height: number;
+  furniture: number;
+  openings: number;
+  active: boolean;
 }
 
 const m = (v: number) => `${formatNumber(v, 2)} m`;
@@ -43,7 +55,8 @@ export async function buildReport(input: ReportInput): Promise<Blob> {
   let page = pdf.addPage();
   header(page, input);
   let y = 104;
-  page.text(MARGIN, y, 'Raumdaten', 12, true);
+  const activeRoom = input.rooms?.find((r) => r.active);
+  page.text(MARGIN, y, fitText(activeRoom ? `Raumdaten – ${activeRoom.name} (${activeRoom.floor})` : 'Raumdaten', 12, width, true), 12, true);
   y += 20;
   const { area, perimeter } = roomMeasurements(room);
   const facts: [string, string][] = [
@@ -161,6 +174,45 @@ export async function buildReport(input: ReportInput): Promise<Blob> {
       y += 17;
     }
     page.text(MARGIN + 4, y + 2, 'Lage: Abstand der Öffnungskante zur Wandecke, gemessen entlang der Wand-Innenseite (lichte Maße).', 7.5, false, MUTED);
+  }
+  if (input.rooms && input.rooms.length > 1) {
+    // Gebäude: alle Zimmer aller Etagen mit Fläche, Höhe und Ausstattung.
+    y += 30;
+    const roomColumns = [
+      { title: 'Etage', x: 0, w: 120 },
+      { title: 'Zimmer', x: 120, w: 150 },
+      { title: 'Fläche', x: 270, w: 70 },
+      { title: 'Höhe', x: 340, w: 60 },
+      { title: 'Möbel', x: 400, w: 50 },
+      { title: 'Türen/Fenster', x: 450, w: width - 450 },
+    ];
+    const roomHeader = () => {
+      page.rect(MARGIN, y - 4, width, 18, { fill: [0.95, 0.96, 0.97] });
+      roomColumns.forEach((c) => page.text(MARGIN + c.x + 4, y, c.title, 8.5, true, MUTED));
+      y += 20;
+    };
+    const newPage = () => {
+      footer(page, pageNumber);
+      page = pdf.addPage();
+      pageNumber++;
+      header(page, input);
+      y = 104;
+    };
+    if (y > A4.height - MARGIN - 80) newPage();
+    const total = input.rooms.reduce((sum, r) => sum + r.area, 0);
+    page.text(MARGIN, y, `Zimmer und Etagen (${input.rooms.length} Zimmer, ${formatNumber(total, 2)} m²)`, 12, true);
+    y += 20;
+    roomHeader();
+    for (const r of input.rooms) {
+      if (y > A4.height - MARGIN - 30) {
+        newPage();
+        roomHeader();
+      }
+      const cells = [r.floor, r.active ? `${r.name} (dieser Bericht)` : r.name, `${formatNumber(r.area, 2)} m²`, m(r.height), String(r.furniture), String(r.openings)];
+      cells.forEach((text, i) => page.text(MARGIN + roomColumns[i].x + 4, y, fitText(text, 9, roomColumns[i].w - 8), 9, r.active && i === 1));
+      page.line(MARGIN, y + 13, MARGIN + width, y + 13, [0.9, 0.91, 0.93], 0.5);
+      y += 17;
+    }
   }
   footer(page, pageNumber);
 

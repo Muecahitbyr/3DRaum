@@ -16,7 +16,10 @@ import { FURNITURE_CATALOG } from '../../config/furniture';
 import { fitShapeOf } from '../../utils/camera';
 import { furnitureToWorld } from '../../utils/furniture';
 import type { RoomModel } from '../../utils/room/model';
+import type { BuildingView } from '../../hooks/useBuildingView';
+import { BuildingContext, FloorSlab } from './BuildingContext';
 import { DevSceneBridge } from './DevSceneBridge';
+import { RoomLabels } from './annotations/RoomLabels';
 import { OpeningMeasures } from './annotations/OpeningMeasures';
 import { FurnitureClearances } from './furniture/clearance/FurnitureClearances';
 import { FurnitureLayer } from './furniture/FurnitureLayer';
@@ -79,6 +82,12 @@ interface PlannerCanvasProps {
   viewMode: ViewMode;
   /** Erhöhen, um die Kameras auf den aktuellen Raum einzupassen (Projekt öffnen/neu). */
   cameraFitToken?: number;
+  /** Gebäude: Nachbarzimmer, gemeinsame Wände, Etage darunter. */
+  building?: BuildingView | null;
+  /** Klick auf ein Nachbarzimmer: dieses Zimmer bearbeiten. */
+  onActivateRoom?: (id: string) => void;
+  /** Grundriss-Editor: aktives Zimmer im Gebäude verschieben (linke/obere Innenecke, Welt). */
+  onMoveRoom?: (position: FloorPoint) => void;
 }
 
 /**
@@ -87,6 +96,7 @@ interface PlannerCanvasProps {
  * So bleibt z. B. die 3D-Kameraposition beim Wechsel 2D ↔ 3D erhalten.
  */
 const NO_SEVERITY: ReadonlyMap<string, CollisionSeverity> = new Map();
+const noop = () => {};
 
 export function PlannerCanvas({
   room,
@@ -123,11 +133,16 @@ export function PlannerCanvas({
   onGestureEnd,
   viewMode,
   cameraFitToken = 0,
+  building = null,
+  onActivateRoom = noop,
+  onMoveRoom,
 }: PlannerCanvasProps) {
+  // Mehrere Zimmer: Eingepasst wird auf die ganze Etage.
+  const floorFit = building?.floorFitShape ?? null;
   // Maße zum Zeitpunkt des Einpassens festhalten: Spätere Maßänderungen bewegen die
   // 3D-Kamera bewusst nicht – nur Start und Projektwechsel (neues Token).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const fitShape3d = useMemo(() => fitShapeOf(room), [cameraFitToken]);
+  const fitShape3d = useMemo(() => floorFit ?? fitShapeOf(room), [cameraFitToken]);
   const isPlan = viewMode === '2d';
   const editing = isPlan && roomEditing;
   // Hohe Möbel (über Augenhöhe) und Türschwenkbereiche (offenes Türblatt) als Hindernisse
@@ -148,8 +163,8 @@ export function PlannerCanvas({
   if (room.plan.shape === 'rectangle' && room.isRectangle && !editing) {
     rectangleKey.current = `${room.dimensions.width}x${room.dimensions.length}`;
   }
-  const fitKey = `${cameraFitToken}|${layoutToken}|${rectangleKey.current}`;
-  const fitShape2d = fitShapeOf(room);
+  const fitKey = `${cameraFitToken}|${layoutToken}|${rectangleKey.current}|${building?.activeFloorId ?? ''}`;
+  const fitShape2d = floorFit ?? fitShapeOf(room);
   const selectedFurniture = furniture.find((f) => f.id === selectedFurnitureId) ?? null;
   const selectedItems = useMemo(
     () => furniture.filter((f) => selectedFurnitureIds.includes(f.id)),
@@ -180,11 +195,14 @@ export function PlannerCanvas({
       }}
     >
       <color attach="background" args={[SCENE_COLORS.background]} />
-      <SceneLights lighting={design.lighting} bounds={room.outerBounds} />
+      <SceneLights lighting={design.lighting} bounds={floorFit?.bounds ?? room.outerBounds} />
       <LampLights furniture={furniture} room={room} enabled={!isPlan} />
-      <SceneGrid />
+      <SceneGrid groundY={isPlan ? 0 : -(building?.activeElevation ?? 0)} />
+      {!isPlan && building && building.activeElevation > 0 && <FloorSlab room={room} />}
       <OpeningDragProvider
-        enabled={isPlan}
+        // Grundriss und „3D Bearbeiten“; die Vorschau bleibt reine Ansicht.
+        enabled={isPlan || !previewing}
+        mode={isPlan ? 'plan' : 'model'}
         room={room}
         openings={openings}
         fixtures={fixtures}
@@ -208,11 +226,15 @@ export function PlannerCanvas({
           selectedWallId={editing ? selectedWallId : null}
           onSelectWall={editing ? onSelectWall : null}
           variant={isPlan ? 'plan' : 'model'}
+          shares={building?.activeShares}
         />
       </OpeningDragProvider>
       {editing && (
         <RoomEditor
           room={room}
+          // Verschieben im Gebäude nur, wenn es Bezugspunkte gibt (andere Zimmer).
+          neighbors={building?.multi ? building.contextRooms.map((c) => c.room) : null}
+          onMoveRoom={onMoveRoom}
           selectedCornerId={selectedCornerId}
           onSelectCorner={onSelectCorner}
           onMoveCorner={onMoveCorner}
@@ -259,6 +281,7 @@ export function PlannerCanvas({
         openings={openings}
         fitShape={fitShape2d}
         fitKey={fitKey}
+        hiddenDimensionWalls={building?.sharedWallIds}
         overlay={(metersPerPixel) => (
           <>
             {single && (
@@ -274,6 +297,11 @@ export function PlannerCanvas({
             {selectedItems.length > 1 && (
               <SelectionBounds items={selectedItems} room={room} metersPerPixel={metersPerPixel} />
             )}
+            {building?.multi && (
+              <RoomLabels
+                rooms={[{ id: building.activeRoomId, name: building.activeRoomName, room, active: true }, ...building.contextRooms.filter((c) => c.sameFloor).map((c) => ({ id: c.id, name: c.name, room: c.room, active: false }))]}
+              />
+            )}
             {selectedOpening && (
               <OpeningMeasures
                 opening={selectedOpening}
@@ -285,6 +313,15 @@ export function PlannerCanvas({
           </>
         )}
       />
+      {building && (
+        <BuildingContext
+          rooms={building.contextRooms}
+          isPlan={isPlan}
+          preview={previewing}
+          showCeiling={previewing || showCeiling}
+          onActivate={onActivateRoom}
+        />
+      )}
       {onCaptureReady && <SceneCapture onReady={onCaptureReady} />}
       {import.meta.env.DEV && <DevSceneBridge />}
     </Canvas>

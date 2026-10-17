@@ -14,7 +14,11 @@ interface RoomDimensionLinesProps {
   /** Türen, Fenster und Durchgänge: Wände mit Öffnungen erhalten eine Maßkette. */
   openings: readonly Opening[];
   metersPerPixel: number;
+  /** Wände ohne Maß (gemeinsame Wand mit einem Nachbarzimmer – das Maß läge in dessen Raum). */
+  hiddenWalls?: ReadonlySet<string>;
 }
+
+const NO_WALLS: ReadonlySet<string> = new Set();
 
 /** Bildschirmmaße der Beschriftungen (Schätzung aus Schriftgröße und Zeichenzahl, Pixel). */
 const LABEL_METRICS: Omit<DimensionLayoutOptions, 'pxPerMeter'> = {
@@ -41,15 +45,21 @@ const LABEL_METRICS: Omit<DimensionLayoutOptions, 'pxPerMeter'> = {
  * Memoisiert: Jede Beschriftung ist ein eigenes HTML-Overlay (eigene React-Wurzel). Beim Ziehen
  * von Möbeln ändern sich Raum, Öffnungen und Zoom nicht – dann rendert hier nichts neu.
  */
-export const RoomDimensionLines = memo(function RoomDimensionLines({ room, openings, metersPerPixel }: RoomDimensionLinesProps) {
-  const wallDimensions = useMemo(() => createWallDimensions(room), [room]);
+export const RoomDimensionLines = memo(function RoomDimensionLines({ room, openings, metersPerPixel, hiddenWalls = NO_WALLS }: RoomDimensionLinesProps) {
+  // Bemaßte Wände (Index in `room.walls`).
+  const shown = useMemo(() => room.walls.flatMap((wall, i) => (hiddenWalls.has(wall.id) ? [] : [i])), [room, hiddenWalls]);
+  const wallDimensions = useMemo(() => {
+    const all = createWallDimensions(room);
+    return shown.map((i) => all[i]);
+  }, [room, shown]);
   const chains = useMemo(
     () =>
-      room.walls.map((wall) => {
+      shown.map((i) => {
+        const wall = room.walls[i];
         const spans = openings.filter((o) => o.wall === wall.id);
         return spans.length ? toReadingChain(wall, openingChain(wall.length, spans)) : null;
       }),
-    [room, openings],
+    [room, openings, shown],
   );
   const layout = useMemo(
     () => layoutRoomDimensions(wallDimensions, chains, { ...LABEL_METRICS, pxPerMeter: 1 / metersPerPixel }),
@@ -67,7 +77,7 @@ export const RoomDimensionLines = memo(function RoomDimensionLines({ room, openi
             {chain && (
               <DimensionChain
                 dimension={dimension}
-                wallId={room.walls[i].id}
+                wallId={room.walls[shown[i]].id}
                 segments={chain}
                 labels={layout[i].chain}
                 elevation={elevation}

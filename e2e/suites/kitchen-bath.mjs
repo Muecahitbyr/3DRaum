@@ -261,8 +261,8 @@ await view('3D');
 await page.getByTestId('project-save').click(); await settle(400);
 const kitchenStored = await stored('kueche');
 const sinkStored = kitchenStored.plan.furniture.find((f) => f.type === 'kitchen-sink');
-check('Gespeichert (Version 7): Küchenmöbel, Oberschrank-Höhe, Farben, Gruppe, Wandfliesen',
-  kitchenStored.version === 7 && kitchenStored.plan.furniture.length === 11 && kitchenStored.plan.furniture.filter((f) => f.type === 'kitchen-wall').every((f) => f.elevation === 1.45) &&
+check('Gespeichert (Version 8): Küchenmöbel, Oberschrank-Höhe, Farben, Gruppe, Wandfliesen',
+  kitchenStored.version === 8 && kitchenStored.plan.furniture.length === 11 && kitchenStored.plan.furniture.filter((f) => f.type === 'kitchen-wall').every((f) => f.elevation === 1.45) &&
   sinkStored.colors.main === '#2f4f6f' && sinkStored.colors.wood === '#c9b28f' && kitchenStored.plan.groups.length === 1 && kitchenStored.plan.design.wallFinishes.north === 'tiles');
 await page.reload(); await page.waitForFunction(() => !!window.__PLANNER_R3F__); await settle(800);
 check('Nach dem Speichern: kein Wiederherstellungsdialog', (await page.getByTestId('recovery-dialog').count()) === 0);
@@ -287,7 +287,7 @@ const inPdf = (t) => pdfText.includes(t) || pdfText.includes(t.replace(/ü/g, '\
 check('PDF: Küchenmöbel in der Möbelliste', ['Küchenoberschrank', 'Spülenschrank', 'Herd mit Backofen', 'Kücheninsel', 'Kühlschrank'].every(inPdf), 'Text im PDF');
 const file = await exportFile(page, 'export-project');
 const json = JSON.parse(fs.readFileSync(file.path, 'utf8'));
-check('Projektdatei: Version 7 mit Küchenmöbeln, ohne Wiederherstellungsdaten', json.version === 7 && json.plan.furniture.length === 11 && !fs.readFileSync(file.path, 'utf8').includes('raumplaner-recovery'));
+check('Projektdatei: Version 8 mit Küchenmöbeln, ohne Wiederherstellungsdaten', json.version === 8 && json.plan.furniture.length === 11 && !fs.readFileSync(file.path, 'utf8').includes('raumplaner-recovery'));
 await page.keyboard.press('Escape'); await settle();
 
 // ---------- 4. Bad: Badvorleger im Türschwenk, Pflanze auf dem Teppich, Wandfliesen

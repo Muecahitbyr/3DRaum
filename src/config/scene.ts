@@ -20,6 +20,8 @@ export const SCENE_COLORS = {
   planSymbol: '#3d4450',
   /** Teppich im Grundriss: dezente Linien (Möbel darauf bleiben klar erkennbar). */
   planRugLine: '#b3aa9b',
+  /** Geschossdecke unter oberen Etagen (3D). */
+  slab: '#d9d6d0',
   gridCell: '#d3d8df',
   gridSection: '#aab3bf',
 } as const;

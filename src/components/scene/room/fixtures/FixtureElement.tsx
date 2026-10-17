@@ -27,19 +27,21 @@ interface FixtureElementProps {
 
 /**
  * Raumobjekt (Heizkörper, Steckdose, Schalter) im lokalen Wandsystem: Auswahl,
- * Hover und – im Grundriss – Ziehen entlang der Wände (wie Türen/Fenster).
+ * Hover und Ziehen entlang der Wände (wie Türen/Fenster; in 3D erst nach dem Auswählen).
  */
 export function FixtureElement({ fixture, span, variant, selected, status, interactive, onSelect }: FixtureElementProps) {
   const isPlan = variant === 'plan';
   const drag = useOpeningDrag();
   const [hovered, setHovered] = useState(false);
-  useCursor(hovered, isPlan && drag ? 'grab' : 'pointer');
+  // Greifen: im Grundriss jedes Objekt, in „3D Bearbeiten“ nur ein bereits ausgewähltes.
+  const grabbable = !!drag && (isPlan || selected);
+  useCursor(hovered, grabbable ? 'grab' : 'pointer');
   useEffect(() => {
     if (!interactive) setHovered(false);
   }, [interactive]);
 
   const handlePointerDown = (event: ThreeEvent<PointerEvent>) => {
-    if (!isPlan || !drag || event.button !== 0) return;
+    if (!grabbable || !drag || event.button !== 0) return;
     event.stopPropagation();
     onSelect(fixture.id);
     drag.startDrag({ kind: 'fixture', item: fixture }, event);

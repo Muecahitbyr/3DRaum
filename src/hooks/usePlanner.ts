@@ -86,6 +86,18 @@ export function usePlanner() {
       selectFurnitureMany: (ids: string[]) => dispatch({ type: 'selectFurnitureMany', ids }),
       /** Wählt ein Raumobjekt aus; `null` hebt jede Auswahl auf. */
       selectFixture: (id: string | null) => dispatch({ type: 'select', selection: id ? { kind: 'fixture', id } : null }),
+      // ---------- Gebäude: Zimmer und Etagen
+      addRoom: () => dispatch({ type: 'addRoom' }),
+      removeRoom: (id: string) => dispatch({ type: 'removeRoom', id }),
+      renameRoom: (id: string, name: string) => dispatch({ type: 'renameRoom', id, name }),
+      /** Anderes Zimmer bearbeiten (kein Verlaufsschritt). */
+      switchRoom: (id: string) => dispatch({ type: 'switchRoom', id }),
+      /** Lage des aktiven Zimmers im Gebäude (linke/obere Innenecke, Welt). */
+      setRoomPosition: (position: FloorPoint) => dispatch({ type: 'setRoomPosition', position }),
+      addFloor: () => dispatch({ type: 'addFloor' }),
+      removeFloor: (id: string) => dispatch({ type: 'removeFloor', id }),
+      renameFloor: (id: string, name: string) => dispatch({ type: 'renameFloor', id, name }),
+      switchFloor: (id: string) => dispatch({ type: 'switchFloor', id }),
     }),
     [],
   );

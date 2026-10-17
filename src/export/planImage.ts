@@ -9,7 +9,7 @@ import { createWallDimensions } from '../utils/room/dimensions';
 import { dimensionPoint, layoutRoomDimensions, type WallDimensionLayout } from '../utils/room/dimensionLayout';
 import { openingChain, roomMeasurements, toReadingChain, type ChainSegment } from '../utils/room/measurements';
 import type { RoomModel } from '../utils/room/model';
-import { pointInPolygon } from '../utils/polygon';
+import { boundsOf, pointInPolygon } from '../utils/polygon';
 import { formatMeters } from '../utils/units';
 
 /**
@@ -18,11 +18,23 @@ import { formatMeters } from '../utils/units';
  * (Auswahl, Griffe, Kollisionsmarkierungen) und ist in beliebiger Auflösung scharf.
  */
 
-export interface PlanImageInput {
+export interface PlanImageRoom {
   room: RoomModel;
   openings: readonly Opening[];
   fixtures: readonly RoomFixture[];
   furniture: readonly FurnitureItem[];
+}
+
+export interface PlanImageInput extends PlanImageRoom {
+  /**
+   * Mehrere Zimmer: die übrigen Zimmer der Etage (eigene Grundrisssysteme, gleiche Welt).
+   * Dann zeigt das Bild die ganze Etage mit Zimmernamen; Maße gelten dem aktiven Zimmer.
+   */
+  neighbors?: readonly (PlanImageRoom & { name: string })[];
+  /** Name des aktiven Zimmers (nur mit `neighbors`). */
+  name?: string;
+  /** Name der Etage für die Fußzeile (nur mit `neighbors`). */
+  floorName?: string;
 }
 
 export interface PlanImageOptions {
@@ -67,11 +79,21 @@ export function renderPlanImage(input: PlanImageInput, options: PlanImageOptions
   // Rand: Mit Öffnungsmaßketten liegt das Gesamtmaß weiter außen (dicke Wände brauchen mehr Platz).
   const maxThickness = Math.max(...room.walls.map((w) => w.thickness));
   const margin = input.openings.length ? Math.max(MARGIN, maxThickness + MAX_FONT_M * (CHAIN_LEVELS.overall + 1) + 0.05) : MARGIN;
+  // Alle Zimmer im Grundrisssystem des aktiven Zimmers (Welt + dessen Ursprung).
+  const neighbors = input.neighbors ?? [];
+  const entries = [
+    { ...input, name: input.name ?? '', shift: { x: 0, z: 0 } },
+    ...neighbors.map((n) => ({ ...n, shift: { x: room.origin.x - n.room.origin.x, z: room.origin.z - n.room.origin.z } })),
+  ];
   // Grundrisskoordinaten; die Hülle inkl. Wandstärken kommt aus dem Modell (Welt) → + Ursprung.
-  const minX = room.outerBounds.minX + room.origin.x - margin;
-  const minZ = room.outerBounds.minZ + room.origin.z - margin;
-  const spanX = room.outerBounds.maxX - room.outerBounds.minX + 2 * margin;
-  const spanZ = room.outerBounds.maxZ - room.outerBounds.minZ + 2 * margin;
+  const world = boundsOf(entries.flatMap((e) => [
+    { x: e.room.outerBounds.minX, z: e.room.outerBounds.minZ },
+    { x: e.room.outerBounds.maxX, z: e.room.outerBounds.maxZ },
+  ]));
+  const minX = world.minX + room.origin.x - margin;
+  const minZ = world.minZ + room.origin.z - margin;
+  const spanX = world.maxX - world.minX + 2 * margin;
+  const spanZ = world.maxZ - world.minZ + 2 * margin;
   let s = Math.min(420, Math.max(40, maxSize / Math.max(spanX, spanZ)));
   // Fußzeile (Maßstab, Fläche) unter dem Plan; die längste Bildseite bleibt bei `maxSize`.
   const fontPx = (scale: number) => Math.min(scale * MAX_FONT_M, 34);
@@ -82,7 +104,10 @@ export function renderPlanImage(input: PlanImageInput, options: PlanImageOptions
   const measureContext = canvas.getContext('2d');
   if (!measureContext) throw new Error('Zeichenfläche nicht verfügbar.');
   const { area, perimeter } = roomMeasurements(room);
-  const footerText = `Grundfläche ${formatMeters(area)} m²  ·  Umfang ${formatMeters(perimeter)} m`;
+  const totalArea = entries.reduce((sum, e) => sum + roomMeasurements(e.room).area, 0);
+  const footerText = neighbors.length
+    ? `${input.floorName ? `${input.floorName}  ·  ` : ''}${entries.length} Zimmer  ·  Fläche gesamt ${formatMeters(totalArea)} m²`
+    : `Grundfläche ${formatMeters(area)} m²  ·  Umfang ${formatMeters(perimeter)} m`;
   const footerFont = `600 ${Math.max(11, F * 0.9)}px ${FONT}`;
   measureContext.font = footerFont;
   const scaleMeters = canvas.width / s > 12 ? 2 : 1;
@@ -95,6 +120,8 @@ export function renderPlanImage(input: PlanImageInput, options: PlanImageOptions
 
   const P = (p: FloorPoint): [number, number] => [(p.x - minX) * s, (p.z - minZ) * s];
   const px = (meters: number) => meters * s;
+  /** Zeichenfunktion je Zimmer (eigenes Grundrisssystem → das des aktiven Zimmers). */
+  const PO = (shift: FloorPoint) => (shift.x === 0 && shift.z === 0 ? P : (p: FloorPoint) => P({ x: p.x + shift.x, z: p.z + shift.z }));
 
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -102,48 +129,66 @@ export function renderPlanImage(input: PlanImageInput, options: PlanImageOptions
   ctx.lineCap = 'round';
 
   // Boden
-  path(ctx, room.polygon.map(P), true);
-  ctx.fillStyle = COLORS.floor;
-  ctx.fill();
-
-  // Teppiche direkt auf dem Boden: Türbögen und alle Möbel liegen darüber (wie im Grundriss).
-  const rugs = input.furniture.filter((item) => item.type === 'rug');
-  for (const rug of rugs) drawFurniture(ctx, rug, P, px);
-
-  // Wände (Gehrungsvierecke)
-  for (const wall of room.walls) {
-    path(ctx, wallQuad(wall).map(P), true);
-    ctx.fillStyle = COLORS.wall;
+  for (const e of entries) {
+    path(ctx, e.room.polygon.map(PO(e.shift)), true);
+    ctx.fillStyle = COLORS.floor;
     ctx.fill();
   }
 
-  // Öffnungen: Lücke in der Wand + Symbol
-  for (const opening of input.openings) {
-    const wall = room.wallById.get(opening.wall);
-    if (wall) drawOpening(ctx, wall, opening, P, px);
+  // Teppiche direkt auf dem Boden: Türbögen und alle Möbel liegen darüber (wie im Grundriss).
+  for (const e of entries) {
+    for (const rug of e.furniture.filter((item) => item.type === 'rug')) drawFurniture(ctx, rug, PO(e.shift), px);
+  }
+
+  // Wände (Gehrungsvierecke) – gemeinsame Wände zweier Zimmer liegen deckungsgleich übereinander.
+  for (const e of entries) {
+    for (const wall of e.room.walls) {
+      path(ctx, wallQuad(wall).map(PO(e.shift)), true);
+      ctx.fillStyle = COLORS.wall;
+      ctx.fill();
+    }
+  }
+
+  // Öffnungen: Lücke in der Wand + Symbol (nach allen Wänden – auch durch gemeinsame Wände).
+  for (const e of entries) {
+    for (const opening of e.openings) {
+      const wall = e.room.wallById.get(opening.wall);
+      if (wall) drawOpening(ctx, wall, opening, PO(e.shift), px);
+    }
   }
 
   // Raumobjekte
-  for (const fixture of input.fixtures) {
-    const wall = room.wallById.get(fixture.wall);
-    if (wall) drawFixture(ctx, wall, fixture, P, px);
+  for (const e of entries) {
+    for (const fixture of e.fixtures) {
+      const wall = e.room.wallById.get(fixture.wall);
+      if (wall) drawFixture(ctx, wall, fixture, PO(e.shift), px);
+    }
   }
 
   // Möbel: zuerst stehende Möbel, dann Oberschränke, Deckenleuchten zuletzt (darüber).
   const layer = (item: FurnitureItem) => (item.type.includes('light') ? 2 : FURNITURE_CATALOG[item.type].wallMounted ? 1 : 0);
-  const ordered = input.furniture.filter((item) => item.type !== 'rug').sort((a, b) => layer(a) - layer(b));
-  for (const item of ordered) drawFurniture(ctx, item, P, px);
+  for (const e of entries) {
+    const ordered = e.furniture.filter((item) => item.type !== 'rug').sort((a, b) => layer(a) - layer(b));
+    for (const item of ordered) drawFurniture(ctx, item, PO(e.shift), px);
+  }
   if (labels) {
-    // Lampe über einem Möbel (Pendel über dem Esstisch, Tischlampe): Beschriftung unter
-    // das Lampensymbol, damit beide Namen lesbar bleiben.
-    const below = (item: FurnitureItem) =>
-      isLamp(item.type) &&
-      input.furniture.some(
-        (other) => other !== item && !isLamp(other.type) && pointInPolygon(item.position, rectanglePolygon(other.position, other.width / 2, other.depth / 2, other.rotationDeg)),
-      );
-    const stacked = stackedLabelShifts(ordered);
-    // Teppiche ohne Beschriftung (liegen unter Möbeln; im PDF-Bericht aufgeführt).
-    for (const item of ordered) drawLabel(ctx, item, P, px, below(item), stacked.get(item.id) ?? 0);
+    for (const e of entries) {
+      const ordered = e.furniture.filter((item) => item.type !== 'rug').sort((a, b) => layer(a) - layer(b));
+      // Lampe über einem Möbel (Pendel über dem Esstisch, Tischlampe): Beschriftung unter
+      // das Lampensymbol, damit beide Namen lesbar bleiben.
+      const below = (item: FurnitureItem) =>
+        isLamp(item.type) &&
+        e.furniture.some(
+          (other) => other !== item && !isLamp(other.type) && pointInPolygon(item.position, rectanglePolygon(other.position, other.width / 2, other.depth / 2, other.rotationDeg)),
+        );
+      const stacked = stackedLabelShifts(ordered);
+      // Teppiche ohne Beschriftung (liegen unter Möbeln; im PDF-Bericht aufgeführt).
+      for (const item of ordered) drawLabel(ctx, item, PO(e.shift), px, below(item), stacked.get(item.id) ?? 0);
+    }
+  }
+  // Mehrere Zimmer: Name und Fläche je Zimmer in der Innenecke oben links.
+  if (neighbors.length) {
+    for (const e of entries) drawRoomName(ctx, e.room, e.name, PO(e.shift), F);
   }
 
   // Maße je Wand: Öffnungsmaßkette (falls Öffnungen) und Gesamtmaß – wie im Grundriss,
@@ -184,6 +229,19 @@ export function renderPlanImage(input: PlanImageInput, options: PlanImageOptions
 }
 
 // ---------------------------------------------------------------- Hilfen
+
+function drawRoomName(ctx: Ctx, room: RoomModel, name: string, P: (p: FloorPoint) => [number, number], F: number) {
+  const corner = room.polygon.reduce((best, p) => (p.x + p.z < best.x + best.z ? p : best), room.polygon[0]);
+  const [x, y] = P(corner);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = COLORS.text;
+  ctx.font = `700 ${F}px ${FONT}`;
+  ctx.fillText(name.trim() || 'Ohne Namen', x + F * 0.5, y + F * 0.5);
+  ctx.fillStyle = COLORS.dimension;
+  ctx.font = `500 ${F * 0.85}px ${FONT}`;
+  ctx.fillText(`${formatMeters(roomMeasurements(room).area)} m²`, x + F * 0.5, y + F * 1.7);
+}
 
 function path(ctx: Ctx, points: [number, number][], close: boolean) {
   ctx.beginPath();

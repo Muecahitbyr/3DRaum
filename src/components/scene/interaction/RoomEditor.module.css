@@ -25,3 +25,26 @@
   cursor: grabbing;
   transform: scale(1.2);
 }
+
+/* Griff „Zimmer verschieben“ (Mitte des Zimmers, nur bei mehreren Zimmern). */
+.move {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-accent-text);
+  box-shadow: var(--shadow-sm);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  transition: transform 100ms ease;
+}
+
+.move:hover {
+  transform: scale(1.1);
+}

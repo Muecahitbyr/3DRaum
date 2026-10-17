@@ -46,7 +46,7 @@ export function createRecoveryDraft(plan: PlanDocument, name: string, base: Reco
       name,
       createdAt: savedAt,
       updatedAt: savedAt,
-      plan: { room: plan.room, openings: plan.openings, furniture: plan.furniture, fixtures: plan.fixtures, groups: plan.groups, design: plan.design },
+      plan: { room: plan.room, openings: plan.openings, furniture: plan.furniture, fixtures: plan.fixtures, groups: plan.groups, design: plan.design, building: plan.building },
     },
   };
 }

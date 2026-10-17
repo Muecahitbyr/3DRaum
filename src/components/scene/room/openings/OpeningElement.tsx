@@ -43,15 +43,18 @@ export function OpeningElement({ opening, variant, onSelect, interactive = true,
   const isPlan = variant === 'plan';
   const drag = useOpeningDrag();
   const [hovered, setHovered] = useState(false);
-  useCursor(hovered, isPlan && drag ? 'grab' : 'pointer');
+  // Greifen: im Grundriss jedes Element, in „3D Bearbeiten“ nur ein bereits ausgewähltes
+  // (wie bei Möbeln – sonst gehört das Ziehen der Kamera).
+  const grabbable = !!drag && (isPlan || partProps.selected);
+  useCursor(hovered, grabbable ? 'grab' : 'pointer');
   useEffect(() => {
     if (!interactive) setHovered(false);
   }, [interactive]);
 
-  // Grundriss: linke Maustaste greift das Element (Auswahl + Ziehen entlang der Wand).
-  // Andere Tasten bleiben der Kamera (Pan) vorbehalten. In 3D gibt es kein Ziehen.
+  // Linke Maustaste bzw. Finger greift das Element (Auswahl + Ziehen entlang der Wände).
+  // Andere Tasten bleiben der Kamera vorbehalten.
   const handlePointerDown = (event: ThreeEvent<PointerEvent>) => {
-    if (!isPlan || !drag || event.button !== 0) return;
+    if (!grabbable || !drag || event.button !== 0) return;
     event.stopPropagation();
     onSelect(opening.id);
     drag.startDrag(opening, event);
